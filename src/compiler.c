@@ -1,4 +1,5 @@
 ﻿#include "headers/compiler.h"
+#include "headers/object.h"
 #include "headers/chunk.h"
 #include "headers/common.h"
 #include "headers/scanner.h"
@@ -80,7 +81,7 @@ static void consume(TokenType type, const char* msg) {
 /// Add [value] to the constants in the chunk currently being compiled.
 ///
 /// Returns the offset of the added constant.
-static uint8_t makeConstant(Value value) {
+static uint8_t makeConstant(const Value value) {
   const int offset = addConstant(currentChunk(), value);
 
   if (offset > UINT8_MAX) {
@@ -150,6 +151,13 @@ static void literal() {
   }
 }
 
+/// Parses a string constant, emitting bytecode for a constant string value.
+static void string() {
+  const char* stringStart = parser.current.start + 1;
+  const int stringLength = parser.current.length - 2;
+  emitConstant(OBJ_VAL(copyString(stringStart, stringLength)));
+}
+
 /// Parses a number constant, emitting bytecode for a constant number value.
 static void number() {
   const double value = strtod(parser.current.start, NULL);
@@ -217,20 +225,20 @@ static void grouping() {
 /// Table holding token parse rules.
 static ParseRule rules[] = {
   // Single character token rules
-  // [TokenType]        = {prefix,   infix,  Precedence },
-  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE  },
-  [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE  },
+  // [TokenType]        = {prefix,   infix,  Precedence      },
+  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE       },
+  [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE       },
 
   // One/two character token rules
-  [TOKEN_MINUS]         = {unary,    binary, PREC_TERM  },
-  [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM  },
-  [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
-  [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
+  [TOKEN_MINUS]         = {unary,    binary, PREC_TERM       },
+  [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM       },
+  [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR     },
+  [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR     },
 
   [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE       },
   [TOKEN_BANG_EQUAL]    = {NULL,     binary, PREC_EQUALITY   },
@@ -242,31 +250,31 @@ static ParseRule rules[] = {
   [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON },
 
   // Literal token rules
-  [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE  },
+  [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_STRING]        = {string,   NULL,   PREC_NONE       },
+  [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE       },
 
   // Keyword token rules
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE  },
-  [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE  },
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE  },
-  [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE       },
+  [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE       },
+  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE       },
+  [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE       },
 
   // Misc token rules
-  [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_EOF]           = {NULL,     NULL,   PREC_NONE       },
 };
 // @formatter:on
 

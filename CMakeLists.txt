@@ -20,4 +20,6 @@ add_executable(clox
         src/debug.c
         src/scanner.c
         src/value.c
-        src/vm.c)
+        src/vm.c
+        src/headers/object.h
+        src/object.c)

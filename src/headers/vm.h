@@ -36,8 +36,6 @@ void push(Value value);
 Value pop();
 
 static Value peek(int distance);
-static bool isFalsey(Value value);
-static bool valuesEqual(Value a, Value b);
 
 InterpretResult interpret(const char* source);
 static InterpretResult run();

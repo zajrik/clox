@@ -1,6 +1,9 @@
 #include <stdarg.h>
+#include <string.h>
 
 #include "headers/vm.h"
+#include "headers/memory.h"
+#include "headers/object.h"
 #include "headers/common.h"
 #include "headers/compiler.h"
 #include "headers/debug.h"
@@ -47,7 +50,7 @@ static void resetStack() {
 ///
 /// Inserts the value into memory at the address pointed to by [vm.stackTop] and
 /// increments the stack top pointer to point to the next open slot on the stack.
-void push(Value value) {
+void push(const Value value) {
   *vm.stackTop = value;
   vm.stackTop++;
 }
@@ -68,24 +71,23 @@ static Value peek(const int distance) {
   // return vm.stackTop[-1 - distance];
 }
 
-/// Returns whether the given [value] is falsey.
-///
-/// `nil` and `false` are falsey, everything else is truthy.
-static bool isFalsey(const Value value) {
-  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
-}
+/// Pop two lox strings off of the stack, allocate a new string, copy the two
+/// strings into the new block of memory and push the new string value to the
+/// stack.
+static void concatenate() {
+  const ObjString* b = AS_STRING(pop());
+  const ObjString* a = AS_STRING(pop());
+  const int length = a->length + b->length;
+  char* chars = ALLOCATE(char, length + 1);
 
-/// Returns whether the given lox values are equal.
-static bool valuesEqual(const Value a, const Value b) {
-  if (a.type != b.type) return false;
-  switch (a.type) {
-    case VAL_NIL: return true;
-    case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-    case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
+  memcpy(chars, a->chars, a->length);
+  memcpy(chars + a->length, b->chars, b->length);
+  chars[length] = '\0';
 
-    // Reference equality
-    default: return &a == &b;
-  }
+  // TODO: Free the abandoned strings!
+  // https://craftinginterpreters.com/strings.html#freeing-objects
+
+  push(OBJ_VAL(allocateString(chars, length)));
 }
 
 /// Interpret the given lox source code text.
@@ -126,9 +128,7 @@ static InterpretResult run() {
     disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->instructions));
     #endif
 
-    uint8_t instruction;
-
-    switch (instruction = READ_BYTE()) {
+    switch (READ_BYTE()) {
       case OP_CONSTANT:
         push(READ_CONSTANT());
         break;
@@ -157,9 +157,21 @@ static InterpretResult run() {
         BINARY_OP(BOOL_VAL, <);
         break;
 
-      case OP_ADD:
-        BINARY_OP(NUMBER_VAL, +);
+      case OP_ADD: {
+        if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+          // ObjString* b = AS_STRING(pop());
+          // ObjString* a = AS_STRING(pop());
+          concatenate();
+        } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+          const double b = AS_NUMBER(pop());
+          const double a = AS_NUMBER(pop());
+          push(NUMBER_VAL(b + a));
+        } else {
+          runtimeError("Operands must both be numbers or strings.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
         break;
+      }
       case OP_SUBTRACT:
         BINARY_OP(NUMBER_VAL, -);
         break;

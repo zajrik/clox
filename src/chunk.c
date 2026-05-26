@@ -25,9 +25,9 @@ void freeChunk(Chunk* chunk) {
 /// Write a [byte] to the instructions array of the chunk at address [chunk].
 ///
 /// The chunk will be resized and reallocated to fit as needed.
-void writeChunk(Chunk* chunk, uint8_t byte, int line) {
+void writeChunk(Chunk* chunk, const uint8_t byte, const int line) {
   if (chunk->capacity < chunk->count + 1) {
-    int oldCapacity = chunk->capacity;
+    const int oldCapacity = chunk->capacity;
     chunk->capacity = GROW_CAPACITY(oldCapacity);
     chunk->instructions = GROW_ARRAY(uint8_t, chunk->instructions, oldCapacity, chunk->capacity);
     chunk->lines = GROW_ARRAY(int, chunk->lines, oldCapacity, chunk->capacity);
@@ -42,7 +42,7 @@ void writeChunk(Chunk* chunk, uint8_t byte, int line) {
 /// pointed to by [chunk].
 ///
 /// Returns the offset of the added constant value within the constants array.
-int addConstant(Chunk* chunk, Value value) {
+int addConstant(Chunk* chunk, const Value value) {
   writeValueArray(&chunk->constants, value);
   return chunk->constants.count - 1;
 }

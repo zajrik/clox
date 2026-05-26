@@ -66,6 +66,7 @@ static void expr(Precedence precedence);
 
 static void expression();
 static void literal();
+static void string();
 static void number();
 static void unary();
 static void binary();
