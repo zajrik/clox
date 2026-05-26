@@ -1,7 +1,7 @@
 ﻿#ifndef CLOX_SCANNER_H
 #define CLOX_SCANNER_H
 
-/// Scans tokens from source text.
+/// Holds data for scanning tokens from source text.
 typedef struct Scanner {
   /// Pointer to the beginning of the lexeme being scanned.
   const char* start;

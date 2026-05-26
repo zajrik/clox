@@ -1,3 +1,5 @@
+#include <stdarg.h>
+
 #include "headers/vm.h"
 #include "headers/common.h"
 #include "headers/compiler.h"
@@ -12,10 +14,14 @@
 
 /// Perform a binary operation using the top two values off the top of the stack,
 /// pushing the result of the operation back onto the stack.
-#define BINARY_OP(op) do { \
-  double b = pop(); \
-  double a = pop(); \
-  push(a op b); \
+#define BINARY_OP(valueType, op) do { \
+  if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+    runtimeError("Operands must be numbers."); \
+    return INTERPRET_RUNTIME_ERROR; \
+  } \
+  double b = AS_NUMBER(pop()); \
+  double a = AS_NUMBER(pop()); \
+  push(valueType(a op b)); \
 } while (false)
 
 /// Global lox virtual machine instance.
@@ -56,8 +62,9 @@ Value pop() {
   return *vm.stackTop;
 }
 
-static Value peek(int distance) {
+static Value peek(const int distance) {
   return *(vm.stackTop - 1 - distance);
+  // return vm.stackTop[-1 - distance];
 }
 
 /// Interpret the given lox source code text.
@@ -106,16 +113,16 @@ static InterpretResult run() {
         break;
 
       case OP_ADD:
-        BINARY_OP(+);
+        BINARY_OP(NUMBER_VAL, +);
         break;
       case OP_SUBTRACT:
-        BINARY_OP(-);
+        BINARY_OP(NUMBER_VAL, -);
         break;
       case OP_MULTIPLY:
-        BINARY_OP(*);
+        BINARY_OP(NUMBER_VAL, *);
         break;
       case OP_DIVIDE:
-        BINARY_OP(/);
+        BINARY_OP(NUMBER_VAL, /);
         break;
 
       case OP_NEGATE:
@@ -135,6 +142,25 @@ static InterpretResult run() {
         return INTERPRET_RUNTIME_ERROR;
     }
   }
+}
+
+static void runtimeError(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fputs("\n", stderr);
+
+  // Find the instruction that failed.
+  //
+  // vm.ip points to the next instruction to be read, vm.chunk->instructions
+  // is the address of the first instruction. Subtracting those provides the
+  // offset of the next instruction to be read
+  const size_t instruction = vm.ip - vm.chunk->instructions - 1;
+  const int line = vm.chunk->lines[instruction];
+
+  fprintf(stderr, "[line %d] in script\n", line);
+  resetStack();
 }
 
 #undef READ_BYTE

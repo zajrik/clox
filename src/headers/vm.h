@@ -31,11 +31,13 @@ typedef enum InterpretResult {
 void initVm();
 void freeVm();
 
-void resetStack();
+static void resetStack();
 void push(Value value);
 Value pop();
 
 InterpretResult interpret(const char* source);
-InterpretResult run();
+static InterpretResult run();
+
+static void runtimeError(const char* format, ...);
 
 #endif
