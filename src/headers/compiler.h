@@ -65,6 +65,7 @@ static uint8_t makeConstant(Value value);
 static void expr(Precedence precedence);
 
 static void expression();
+static void literal();
 static void number();
 static void unary();
 static void binary();
@@ -77,7 +78,7 @@ static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
 static void emitReturn();
 
-static void errorAtCurrent(const char* msg);
+static void errorAtNext(const char* msg);
 static void error(const char* msg);
 
 #endif

@@ -35,6 +35,8 @@ static void resetStack();
 void push(Value value);
 Value pop();
 
+static Value peek(int distance);
+
 InterpretResult interpret(const char* source);
 static InterpretResult run();
 

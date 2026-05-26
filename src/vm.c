@@ -62,9 +62,17 @@ Value pop() {
   return *vm.stackTop;
 }
 
+/// Peek at a value in the stack, offset by [distance] from the top of the stack.
 static Value peek(const int distance) {
   return *(vm.stackTop - 1 - distance);
   // return vm.stackTop[-1 - distance];
+}
+
+/// Returns whether the given [value] is falsey.
+///
+/// `nil` and `false` are falsey, everything else is truthy.
+static bool isFalsey(const Value value) {
+  return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
 /// Interpret the given lox source code text.
@@ -112,6 +120,16 @@ static InterpretResult run() {
         push(READ_CONSTANT());
         break;
 
+      case OP_NIL:
+        push(NIL_VAL);
+        break;
+      case OP_TRUE:
+        push(BOOL_VAL(true));
+        break;
+      case OP_FALSE:
+        push(BOOL_VAL(false));
+        break;
+
       case OP_ADD:
         BINARY_OP(NUMBER_VAL, +);
         break;
@@ -125,9 +143,13 @@ static InterpretResult run() {
         BINARY_OP(NUMBER_VAL, /);
         break;
 
+      case OP_NOT:
+        push(BOOL_VAL(isFalsey(pop())));
+        break;
+
       case OP_NEGATE:
         if (!IS_NUMBER(peek(0))) {
-          // runtimeError("Operand must be a number.");
+          runtimeError("Operand must be a number.");
           return INTERPRET_RUNTIME_ERROR;
         }
         push(NUMBER_VAL(-AS_NUMBER(pop())));

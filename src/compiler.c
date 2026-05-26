@@ -61,7 +61,7 @@ static void advance() {
     parser.next = scanToken();
     if (parser.next.type != TOKEN_ERROR) break;
 
-    errorAtCurrent(parser.next.start);
+    errorAtNext(parser.next.start);
   }
 }
 
@@ -74,7 +74,7 @@ static void consume(TokenType type, const char* msg) {
     return;
   }
 
-  errorAtCurrent(msg);
+  errorAtNext(msg);
 }
 
 /// Add [value] to the constants in the chunk currently being compiled.
@@ -131,6 +131,25 @@ static void expression() {
   expr(PREC_ASSIGNMENT);
 }
 
+/// Parses a keyword-literal expression, emitting the relevant opcode.
+static void literal() {
+  switch (parser.current.type) {
+    case TOKEN_NIL:
+      emitByte(OP_NIL);
+      break;
+
+    case TOKEN_TRUE:
+      emitByte(OP_TRUE);
+      break;
+
+    case TOKEN_FALSE:
+      emitByte(OP_FALSE);
+      break;
+
+    default: return;
+  }
+}
+
 /// Parses a number constant, emitting bytecode for a constant number value.
 static void number() {
   const double value = strtod(parser.current.start, NULL);
@@ -149,6 +168,10 @@ static void unary() {
   switch (operatorType) {
     case TOKEN_MINUS:
       emitByte(OP_NEGATE);
+      break;
+
+    case TOKEN_BANG:
+      emitByte(OP_NOT);
       break;
 
     default: return;
@@ -204,7 +227,7 @@ static ParseRule rules[] = {
   [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
 
-  [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE  },
   [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE  },
@@ -222,17 +245,17 @@ static ParseRule rules[] = {
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_FALSE]         = {literal,  NULL,   PREC_NONE  },
   [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_NIL]           = {literal,  NULL,   PREC_NONE  },
   [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_TRUE]          = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE  },
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE  },
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE  },
 
@@ -292,12 +315,12 @@ static void errorAt(const Token* token, const char* msg) {
   fprintf(stderr, ": %s\n", msg);
 }
 
-/// Output error [msg] at the current scanned token.
-static void errorAtCurrent(const char* msg) {
+/// Output error [msg] at the next scanned token to be parsed.
+static void errorAtNext(const char* msg) {
   errorAt(&parser.next, msg);
 }
 
-/// Output error [msg] at the previously scanned token.
+/// Output error [msg] at the current scanned token being parsed.
 static void error(const char* msg) {
   errorAt(&parser.current, msg);
 }

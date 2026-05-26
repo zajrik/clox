@@ -12,6 +12,15 @@ typedef enum OpCode {
   /// chunk's constants array.
   OP_CONSTANT,
 
+  /// Push literal `nil` onto the stack.
+  OP_NIL,
+
+  /// Push literal `true` onto the stack.
+  OP_TRUE,
+
+  /// Push literal `false` onto the stack.
+  OP_FALSE,
+
   /// Pop two operands off stack, add them, push result to stack.
   OP_ADD,
 
@@ -23,6 +32,9 @@ typedef enum OpCode {
 
   /// Pop two operands off stack, divide them, push result to stack.
   OP_DIVIDE,
+
+  /// Pop boolean operand off stack, negate it, push result to stack.
+  OP_NOT,
 
   /// Pop one operand off stack, negate it, push result to stack.
   OP_NEGATE,
