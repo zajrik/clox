@@ -75,6 +75,19 @@ static bool isFalsey(const Value value) {
   return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
 
+/// Returns whether the given lox values are equal.
+static bool valuesEqual(const Value a, const Value b) {
+  if (a.type != b.type) return false;
+  switch (a.type) {
+    case VAL_NIL: return true;
+    case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
+    case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
+
+    // Reference equality
+    default: return &a == &b;
+  }
+}
+
 /// Interpret the given lox source code text.
 ///
 /// Code will be compiled before being run on the virtual machine.
@@ -103,14 +116,14 @@ static InterpretResult run() {
     printf("            ");
 
     // Print contents of stack, starting at pointer to the first slot
-    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+    for (const Value* slot = vm.stack; slot < vm.stackTop; slot++) {
       printf("[ ");
       printValue(*slot);
       printf(" ]");
     }
 
     printf("\n");
-    disassembleInstruction(vm.chunk, vm.ip - vm.chunk->instructions);
+    disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->instructions));
     #endif
 
     uint8_t instruction;
@@ -128,6 +141,20 @@ static InterpretResult run() {
         break;
       case OP_FALSE:
         push(BOOL_VAL(false));
+        break;
+
+      case OP_EQUAL: {
+        const Value b = pop();
+        const Value a = pop();
+        push(BOOL_VAL(valuesEqual(a, b)));
+        break;
+      }
+
+      case OP_GREATER:
+        BINARY_OP(BOOL_VAL, >);
+        break;
+      case OP_LESS:
+        BINARY_OP(BOOL_VAL, <);
         break;
 
       case OP_ADD:

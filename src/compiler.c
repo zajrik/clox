@@ -187,12 +187,17 @@ static void binary() {
   const TokenType operatorType = parser.current.type;
   const ParseRule* operatorRule = getRule(operatorType);
 
-  // A binary operator's right-hand operand precedence is always one level higher
-  // than the operator's own precedence so we parse the right-hand expression
-  // with precedence one level higher than the operator
+  // Compile the right-hand operand. A binary operator's right-hand operand
+  // precedence is always one level higher than the operator's own precedence
   expr(operatorRule->precedence + 1);
 
   switch (operatorType) {
+    case TOKEN_EQUAL_EQUAL: return emitByte(OP_EQUAL);
+    case TOKEN_BANG_EQUAL: return emitBytes(OP_EQUAL, OP_NOT);
+    case TOKEN_GREATER: return emitByte(OP_GREATER);
+    case TOKEN_GREATER_EQUAL: return emitBytes(OP_GREATER, OP_NOT);
+    case TOKEN_LESS: return emitByte(OP_LESS);
+    case TOKEN_LESS_EQUAL: return emitBytes(OP_LESS, OP_NOT);
     case TOKEN_PLUS: return emitByte(OP_ADD);
     case TOKEN_MINUS: return emitByte(OP_SUBTRACT);
     case TOKEN_STAR: return emitByte(OP_MULTIPLY);
@@ -227,14 +232,14 @@ static ParseRule rules[] = {
   [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
 
-  [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE  },
-  [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE  },
-  [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE  },
+  [TOKEN_BANG]          = {unary,    NULL,   PREC_NONE       },
+  [TOKEN_BANG_EQUAL]    = {NULL,     binary, PREC_EQUALITY   },
+  [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE       },
+  [TOKEN_EQUAL_EQUAL]   = {NULL,     binary, PREC_EQUALITY   },
+  [TOKEN_GREATER]       = {NULL,     binary, PREC_COMPARISON },
+  [TOKEN_GREATER_EQUAL] = {NULL,     binary, PREC_COMPARISON },
+  [TOKEN_LESS]          = {NULL,     binary, PREC_COMPARISON },
+  [TOKEN_LESS_EQUAL]    = {NULL,     binary, PREC_COMPARISON },
 
   // Literal token rules
   [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE  },

@@ -21,6 +21,15 @@ typedef enum OpCode {
   /// Push literal `false` onto the stack.
   OP_FALSE,
 
+  /// Pop two operands off stack, compare, push result to stack.
+  OP_EQUAL,
+
+  /// Pop two operands off stack, compare, push result to stack.
+  OP_GREATER,
+
+  /// Pop two operands off stack, compare, push result to stack.
+  OP_LESS,
+
   /// Pop two operands off stack, add them, push result to stack.
   OP_ADD,
 
