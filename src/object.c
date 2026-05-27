@@ -26,11 +26,22 @@ Obj* allocateObject(const size_t size, const ObjType type) {
   return object;
 }
 
+/// Hashes a [string] of the given [length] using the FNV-1a hashing algorithm.
+uint32_t hashString(const char* string, const int length) {
+  uint32_t hash = 2166136261u;
+  for (int i = 0; i < length; i++) {
+    hash ^= (uint8_t)string[i];
+    hash *= 16777619;
+  }
+  return hash;
+}
+
 /// Allocates a new lox string object and returns a pointer to it.
-ObjString* allocateString(char* chars, const int length) {
+ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
+  string->hash = hash;
   return string;
 }
 
@@ -45,7 +56,9 @@ ObjString* copyString(const char* chars, const int length) {
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
   heapChars[length] = '\0';
-  return allocateString(heapChars, length);
+
+  const uint32_t hash = hashString(heapChars, length);
+  return allocateString(heapChars, length, hash);
 }
 
 /// Print the given lox object value.

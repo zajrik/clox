@@ -90,7 +90,8 @@ static void concatenate() {
   freeObject((Obj*)b);
   freeObject((Obj*)a);
 
-  push(OBJ_VAL(allocateString(chars, length)));
+  const uint32_t hash = hashString(chars, length);
+  push(OBJ_VAL(allocateString(chars, length, hash)));
 }
 
 /// Interpret the given lox source code text.

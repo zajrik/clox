@@ -28,10 +28,12 @@ struct ObjString {
   Obj object;
   int length;
   char* chars;
+  uint32_t hash;
 };
 
+uint32_t hashString(const char* string, int length);
 ObjString* copyString(const char* chars, int length);
-ObjString* allocateString(char* chars, int length);
+ObjString* allocateString(char* chars, int length, uint32_t hash);
 Obj* allocateObject(size_t size, ObjType type);
 
 /// Returns whether the given lox [Value] is the given [ObjType].
