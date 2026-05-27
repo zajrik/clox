@@ -31,12 +31,12 @@ struct ObjString {
 };
 
 ObjString* copyString(const char* chars, int length);
-ObjString* allocateString(const char* chars, int length);
+ObjString* allocateString(char* chars, int length);
 Obj* allocateObject(size_t size, ObjType type);
 
 /// Returns whether the given lox [Value] is the given [ObjType].
 static bool isObjType(const Value value, const ObjType type) {
-  return IS_OBJ(value) && AS_OBJ(value)->type == type;
+  return IS_OBJ(value) && OBJ_TYPE(value) == type;
 }
 
 void printObject(Value value);

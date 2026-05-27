@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "headers/chunk.h"
-#include "headers/common.h"
-#include "headers/debug.h"
 #include "headers/vm.h"
 
 static void repl() {
@@ -62,14 +59,14 @@ static char* readFile(const char* path) {
 /// Interpret the file at the given file [path].
 static void runFile(const char* path) {
   char* source = readFile(path);
-  InterpretResult result = interpret(source);
+  const InterpretResult result = interpret(source);
   free(source);
 
   if (result == INTERPRET_COMPILE_ERROR) exit(65);
   if (result == INTERPRET_RUNTIME_ERROR) exit(70);
 }
 
-int main(int argc, const char* argv[]) {
+int main(const int argc, const char* argv[]) {
   initVm();
 
   if (argc == 1) {

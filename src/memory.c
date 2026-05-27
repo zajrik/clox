@@ -1,7 +1,9 @@
 #include "headers/memory.h"
+
 #include "headers/common.h"
 #include "headers/object.h"
 #include "headers/value.h"
+#include "headers/vm.h"
 
 /// Reallocates memory at address [ptr], allocating [newSize] bytes.
 ///
@@ -23,6 +25,7 @@ void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
 void freeObject(Obj* object) {
   switch (object->type) {
     case OBJ_STRING: {
+      printf("freeing %p\n", (void*)object);
       const ObjString* strObj = (ObjString*)object;
       FREE_ARRAY(char, strObj->chars, strObj->length + 1);
       FREE(ObjString, object);
@@ -36,7 +39,6 @@ void freeObjects() {
   Obj* object = vm.objects;
   while (object != NULL) {
     Obj* next = object->next;
-    printf("freeing %p\n", (void*)object);
     freeObject(object);
     object = next;
   }

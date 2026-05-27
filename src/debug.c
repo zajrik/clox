@@ -16,7 +16,7 @@ void disassembleChunk(const Chunk* chunk, const char* name) {
 /// instructions array.
 ///
 /// Returns the offset of the next instruction.
-int disassembleInstruction(const Chunk* chunk, int offset) {
+int disassembleInstruction(const Chunk* chunk, const int offset) {
   printf("%04d ", offset);
 
   if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
@@ -56,7 +56,7 @@ int disassembleInstruction(const Chunk* chunk, int offset) {
 /// Print the [name] of a simple instruction at [offset] in the instructions array.
 ///
 /// Returns the offset of the next instruction.
-static int simpleInstruction(const char* name, int offset) {
+static int simpleInstruction(const char* name, const int offset) {
   printf("%s\n", name);
 
   return offset + 1;
@@ -66,7 +66,7 @@ static int simpleInstruction(const char* name, int offset) {
 /// array, as well the value of the constant operand following the instruction.
 ///
 /// Returns the offset of the next instruction (skipping over the constant operand).
-static int constantInstruction(const char* name, const Chunk* chunk, int offset) {
+static int constantInstruction(const char* name, const Chunk* chunk, const int offset) {
   // Get the constant value byte after the instruction byte
   const uint8_t constant = chunk->instructions[offset + 1];
 

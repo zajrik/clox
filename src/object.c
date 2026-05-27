@@ -19,6 +19,7 @@ Obj* allocateObject(const size_t size, const ObjType type) {
   // SAFETY: reallocate will exit if it fails to allocate the memory
   object->type = type;
 
+  // Link vm objects for cleaning up when vm closes.
   object->next = vm.objects;
   vm.objects = object;
 
@@ -50,8 +51,6 @@ ObjString* copyString(const char* chars, const int length) {
 /// Print the given lox object value.
 void printObject(const Value value) {
   switch (OBJ_TYPE(value)) {
-    case OBJ_STRING:
-      printf("%s", AS_CSTRING(value));
-      break;
+    case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
   }
 }

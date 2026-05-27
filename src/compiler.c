@@ -1,7 +1,7 @@
 ﻿#include "headers/compiler.h"
-#include "headers/object.h"
 #include "headers/chunk.h"
 #include "headers/common.h"
+#include "headers/object.h"
 #include "headers/scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -69,12 +69,8 @@ static void advance() {
 /// Consume a token of the given [type] from scanned tokens.
 ///
 /// Emits an error [msg] if the token type is not consumed.
-static void consume(TokenType type, const char* msg) {
-  if (parser.next.type == type) {
-    advance();
-    return;
-  }
-
+static void consume(const TokenType type, const char* msg) {
+  if (parser.next.type == type) return advance();
   errorAtNext(msg);
 }
 
@@ -94,7 +90,7 @@ static uint8_t makeConstant(const Value value) {
 
 /// Parses an expression from scanned tokens following the given [precedence],
 /// emitting bytecode for all operations in the parsed expression.
-static void expr(Precedence precedence) {
+static void expr(const Precedence precedence) {
   advance();
 
   // Start with a prefix rule to parse/compile the first expression. The first token
@@ -107,10 +103,7 @@ static void expr(Precedence precedence) {
   // -1 + 1); // unary minus is a prefix rule
 
   const ParseFn prefixRule = getRule(parser.current.type)->prefix;
-  if (prefixRule == NULL) {
-    error("Expected expression.");
-    return;
-  }
+  if (prefixRule == NULL) return error("Expected expression.");
   prefixRule();
 
   // If the precedence of the next token is too low, we stop here. This indicates
@@ -135,19 +128,10 @@ static void expression() {
 /// Parses a keyword-literal expression, emitting the relevant opcode.
 static void literal() {
   switch (parser.current.type) {
-    case TOKEN_NIL:
-      emitByte(OP_NIL);
-      break;
-
-    case TOKEN_TRUE:
-      emitByte(OP_TRUE);
-      break;
-
-    case TOKEN_FALSE:
-      emitByte(OP_FALSE);
-      break;
-
-    default: return;
+    case TOKEN_NIL: DO(emitByte(OP_NIL));
+    case TOKEN_TRUE: DO(emitByte(OP_TRUE));
+    case TOKEN_FALSE: DO(emitByte(OP_FALSE));
+    default: break;
   }
 }
 
@@ -174,15 +158,9 @@ static void unary() {
 
   // Emit the operator opcode
   switch (operatorType) {
-    case TOKEN_MINUS:
-      emitByte(OP_NEGATE);
-      break;
-
-    case TOKEN_BANG:
-      emitByte(OP_NOT);
-      break;
-
-    default: return;
+    case TOKEN_MINUS: DO(emitByte(OP_NEGATE));
+    case TOKEN_BANG: DO(emitByte(OP_NOT));
+    default: break;
   }
 }
 
@@ -211,7 +189,7 @@ static void binary() {
     case TOKEN_STAR: return emitByte(OP_MULTIPLY);
     case TOKEN_SLASH: return emitByte(OP_DIVIDE);
 
-    default: return;
+    default: break;
   }
 }
 
@@ -279,26 +257,26 @@ static ParseRule rules[] = {
 // @formatter:on
 
 /// Returns the [ParseRule] for the given [type].
-static ParseRule* getRule(TokenType type) {
+static ParseRule* getRule(const TokenType type) {
   return &rules[type];
 }
 
 // Chunk writing ==============================================================
 
 /// Write the given [byte] to the chunk currently being compiled.
-static void emitByte(uint8_t byte) {
+static void emitByte(const uint8_t byte) {
   writeChunk(currentChunk(), byte, parser.current.line);
 }
 
 /// Write the given bytes ([a] and [b]) to the chunk currently being compiled.
-static void emitBytes(uint8_t a, uint8_t b) {
+static void emitBytes(const uint8_t a, const uint8_t b) {
   emitByte(a);
   emitByte(b);
 }
 
 /// Write [OP_CONSTANT] and the constant offset for [value] to the chunk currently
 /// being compiled.
-static void emitConstant(Value value) {
+static void emitConstant(const Value value) {
   emitBytes(OP_CONSTANT, makeConstant(value));
 }
 

@@ -87,8 +87,8 @@ static void concatenate() {
   memcpy(chars + a->length, b->chars, b->length);
   chars[length] = '\0';
 
-  // TODO: Free the abandoned strings!
-  // https://craftinginterpreters.com/strings.html#freeing-objects
+  freeObject((Obj*)b);
+  freeObject((Obj*)a);
 
   push(OBJ_VAL(allocateString(chars, length)));
 }
@@ -105,6 +105,9 @@ InterpretResult interpret(const char* source) {
     return INTERPRET_COMPILE_ERROR;
   }
 
+  // ReSharper disable once CppDFALocalValueEscapesFunction
+  // SAFETY: I trust Bob with my pointers (also I know for sure it's safely freed
+  // and unused after being freed).
   vm.chunk = &chunk;
   vm.ip = vm.chunk->instructions;
 
@@ -128,24 +131,14 @@ static InterpretResult run() {
     }
 
     printf("\n");
-    // ReSharper disable once CppRedundantCastExpression
     disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->instructions));
     #endif
 
     switch (READ_BYTE()) {
-      case OP_CONSTANT:
-        push(READ_CONSTANT());
-        break;
-
-      case OP_NIL:
-        push(NIL_VAL);
-        break;
-      case OP_TRUE:
-        push(BOOL_VAL(true));
-        break;
-      case OP_FALSE:
-        push(BOOL_VAL(false));
-        break;
+      case OP_CONSTANT: DO(push(READ_CONSTANT()));
+      case OP_NIL: DO(push(NIL_VAL));
+      case OP_TRUE: DO(push(BOOL_VAL(true)));
+      case OP_FALSE: DO(push(BOOL_VAL(false)));
 
       case OP_EQUAL: {
         const Value b = pop();
@@ -154,17 +147,11 @@ static InterpretResult run() {
         break;
       }
 
-      case OP_GREATER:
-        BINARY_OP(BOOL_VAL, >);
-        break;
-      case OP_LESS:
-        BINARY_OP(BOOL_VAL, <);
-        break;
+      case OP_GREATER: DO(BINARY_OP(BOOL_VAL, >));
+      case OP_LESS: DO(BINARY_OP(BOOL_VAL, <));
 
       case OP_ADD: {
         if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
-          // ObjString* b = AS_STRING(pop());
-          // ObjString* a = AS_STRING(pop());
           concatenate();
         } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
           const double b = AS_NUMBER(pop());
@@ -176,19 +163,10 @@ static InterpretResult run() {
         }
         break;
       }
-      case OP_SUBTRACT:
-        BINARY_OP(NUMBER_VAL, -);
-        break;
-      case OP_MULTIPLY:
-        BINARY_OP(NUMBER_VAL, *);
-        break;
-      case OP_DIVIDE:
-        BINARY_OP(NUMBER_VAL, /);
-        break;
-
-      case OP_NOT:
-        push(BOOL_VAL(isFalsey(pop())));
-        break;
+      case OP_SUBTRACT: DO(BINARY_OP(NUMBER_VAL, -));
+      case OP_MULTIPLY: DO(BINARY_OP(NUMBER_VAL, *));
+      case OP_DIVIDE: DO(BINARY_OP(NUMBER_VAL, /));
+      case OP_NOT: DO(push(BOOL_VAL(isFalsey(pop()))));
 
       case OP_NEGATE:
         if (!IS_NUMBER(peek(0))) {

@@ -37,12 +37,12 @@ typedef struct Value {
 #define AS_NUMBER(value) ((value).as.number)
 #define AS_OBJ(value) ((value).as.object)
 
-#define BOOL_VAL(value) ((Value){VAL_BOOL, {.boolean = value}})
+#define BOOL_VAL(value) ((Value){VAL_BOOL, {.boolean = (value)}})
 #define NIL_VAL ((Value){VAL_NIL, {.number = 0}})
-#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
+#define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = (value)}})
 
 /// Wraps the given [Obj] pointer into an object [Value].
-#define OBJ_VAL(objPtr) ((Value){VAL_OBJ, {.object = (Obj*)objPtr}})
+#define OBJ_VAL(objPtr) ((Value){VAL_OBJ, {.object = (Obj*)(objPtr)}})
 
 /// Dynamically-sized array of lox [Value]s.
 typedef struct ValueArray {

@@ -2,8 +2,8 @@
 #include <string.h>
 
 #include "headers/value.h"
-#include "headers/object.h"
 #include "headers/memory.h"
+#include "headers/object.h"
 
 /// Initialize a [ValueArray] at address [array].
 void initValueArray(ValueArray* array) {
@@ -56,7 +56,7 @@ bool valuesEqual(const Value a, const Value b) {
       // me implement char-by-char comparison with early exit on mismatched chars?
       return aString->length == bString->length
         && memcmp(aString->chars, bString->chars, aString->length) == 0;
-    };
+    }
 
     // Reference equality
     default: return &a == &b;

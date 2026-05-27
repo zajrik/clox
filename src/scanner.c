@@ -103,20 +103,20 @@ static TokenType checkKeyword(
   const char* rest,
   const TokenType type
 ) {
-  const int tokenLength = scanner.current - scanner.start;
+  const int tokenLength = (int)(scanner.current - scanner.start);
   const int keywordLength = start + length;
 
   if (tokenLength != keywordLength) return TOKEN_IDENTIFIER;
 
-  const bool matchesRest = memcmp(scanner.start + start, rest, length) == 0;
-  if (matchesRest) return type;
-
-  return TOKEN_IDENTIFIER;
+  // Compare remainder of token string
+  return memcmp(scanner.start + start, rest, length) == 0
+    ? type
+    : TOKEN_IDENTIFIER;
 }
 
 /// Determines the token type of the currently-scanned identifier.
 static TokenType identifierType() {
-  const int tokenLength = scanner.current - scanner.start;
+  const int tokenLength = (int)(scanner.current - scanner.start);
 
   switch (*scanner.start) {
     case 'a': return checkKeyword(1, 2, "nd", TOKEN_AND);
@@ -130,7 +130,7 @@ static TokenType identifierType() {
           case 'a': return checkKeyword(2, 3, "lse", TOKEN_FALSE);
           case 'o': return checkKeyword(2, 1, "r", TOKEN_FOR);
           case 'u': return checkKeyword(2, 1, "n", TOKEN_FUN);
-          default: return TOKEN_IDENTIFIER;
+          default: break;
         }
       }
       break;
@@ -146,15 +146,14 @@ static TokenType identifierType() {
         switch (*(scanner.start + 1)) {
           case 'h': return checkKeyword(2, 2, "is", TOKEN_THIS);
           case 'r': return checkKeyword(2, 2, "ue", TOKEN_TRUE);
-          default: return TOKEN_IDENTIFIER;
+          default: break;
         }
       }
       break;
 
     case 'v': return checkKeyword(1, 2, "ar", TOKEN_VAR);
     case 'w': return checkKeyword(1, 4, "hile", TOKEN_WHILE);
-
-    default: return TOKEN_IDENTIFIER;
+    default: break;
   }
 
   return TOKEN_IDENTIFIER;
@@ -163,7 +162,6 @@ static TokenType identifierType() {
 /// Consumes an identifier token from source.
 static Token identifier() {
   while (isAlphaNumeric(peek())) advance();
-
   return makeToken(identifierType());
 }
 
@@ -238,7 +236,7 @@ Token makeToken(const TokenType type) {
   Token token;
   token.type = type;
   token.start = scanner.start;
-  token.length = scanner.current - scanner.start;
+  token.length = (int)(scanner.current - scanner.start);
   token.line = scanner.line;
   return token;
 }
