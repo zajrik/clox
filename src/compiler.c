@@ -58,7 +58,7 @@ static void endCompilation() {
 static void advance() {
   parser.current = parser.next;
 
-  for (;;) {
+  loop {
     parser.next = scanToken();
     if (parser.next.type != TOKEN_ERROR) break;
 

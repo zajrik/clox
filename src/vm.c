@@ -119,7 +119,7 @@ InterpretResult interpret(const char* source) {
 
 /// Run the instructions from the currently loaded [Chunk].
 static InterpretResult run() {
-  for (;;) {
+  loop {
     #ifdef DEBUG_TRACE_EXECUTION
     printf("            ");
 

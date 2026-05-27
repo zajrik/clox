@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "headers/scanner.h"
+#include "headers/common.h"
 
 /// Global token scanner instance.
 Scanner scanner;
@@ -67,10 +68,8 @@ static bool isAlphaNumeric(const char character) {
 
 /// Advances the scanner until we see a non-whitespace character.
 static void skipWhitespace() {
-  for (;;) {
-    const char c = peek();
-
-    switch (c) {
+  loop {
+    switch (peek()) {
       case ' ':
       case '\r':
       case '\t':

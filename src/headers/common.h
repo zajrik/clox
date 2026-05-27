@@ -22,4 +22,7 @@
 /// </code>
 #define DO(stmt) stmt; break
 
+/// Sugar for `for (;;)` because I think it's ugly :(
+#define loop for (;;)
+
 #endif
