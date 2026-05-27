@@ -19,6 +19,9 @@ typedef struct Vm {
 
   /// Pointer to the top of the stack, where the next item will be inserted.
   Value* stackTop;
+
+  /// Linked list of allocated lox objects.
+  Obj* objects;
 } Vm;
 
 /// Result of interpreting a set of instructions.
@@ -27,6 +30,8 @@ typedef enum InterpretResult {
   INTERPRET_COMPILE_ERROR,
   INTERPRET_RUNTIME_ERROR,
 } InterpretResult;
+
+extern Vm vm;
 
 void initVm();
 void freeVm();

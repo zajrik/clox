@@ -1,8 +1,9 @@
 #include <string.h>
 
-#include "value.h"
-#include "object.h"
-#include "memory.h"
+#include "headers/object.h"
+#include "headers/memory.h"
+#include "headers/value.h"
+#include "headers/vm.h"
 
 /// Allocate a block of memory for a lox object sized for the given [type] and
 /// returns a pointer to it.
@@ -17,11 +18,15 @@ Obj* allocateObject(const size_t size, const ObjType type) {
   // ReSharper disable once CppDFANullDereference
   // SAFETY: reallocate will exit if it fails to allocate the memory
   object->type = type;
+
+  object->next = vm.objects;
+  vm.objects = object;
+
   return object;
 }
 
 /// Allocates a new lox string object and returns a pointer to it.
-ObjString* allocateString(const char* chars, const int length) {
+ObjString* allocateString(char* chars, const int length) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;

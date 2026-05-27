@@ -374,6 +374,8 @@
             <SDLCheck>true</SDLCheck>
             <LinkCompiled>true</LinkCompiled>
         </ClCompile>
+        <ClCompile Include="src\memory.c"/>
+        <ClCompile Include="src\object.c"/>
         <ClCompile Include="src\scanner.c"/>
         <ClCompile Include="src\value.c">
             <RuntimeLibrary>MultiThreadedDebugDll</RuntimeLibrary>
@@ -538,6 +540,7 @@
         <ClInclude Include="src\headers\compiler.h"/>
         <ClInclude Include="src\headers\debug.h"/>
         <ClInclude Include="src\headers\memory.h"/>
+        <ClInclude Include="src\headers\object.h"/>
         <ClInclude Include="src\headers\scanner.h"/>
         <ClInclude Include="src\headers\value.h"/>
         <ClInclude Include="src\headers\vm.h"/>

@@ -2,11 +2,11 @@
 #include <string.h>
 
 #include "headers/vm.h"
-#include "headers/memory.h"
-#include "headers/object.h"
 #include "headers/common.h"
 #include "headers/compiler.h"
 #include "headers/debug.h"
+#include "headers/memory.h"
+#include "headers/object.h"
 
 /// Read the byte pointed to by the current vm instruction pointer and increment
 /// the instruction pointer to point to the next byte.
@@ -33,10 +33,13 @@ Vm vm;
 /// Initialize the virtual machine.
 void initVm() {
   resetStack();
+  vm.objects = NULL;
 }
 
 /// Free resources used by the virtual machine. (eventually)
-void freeVm() {}
+void freeVm() {
+  freeObjects();
+}
 
 /// Reset the virtual machine stack.
 ///
@@ -125,6 +128,7 @@ static InterpretResult run() {
     }
 
     printf("\n");
+    // ReSharper disable once CppRedundantCastExpression
     disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->instructions));
     #endif
 

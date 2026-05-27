@@ -20,13 +20,14 @@ typedef enum ObjType {
 /// Base struct for heap-allocated lox object values.
 struct Obj {
   ObjType type;
+  Obj* next;
 };
 
 /// Represents a lox string value.
 struct ObjString {
   Obj object;
   int length;
-  const char* chars;
+  char* chars;
 };
 
 ObjString* copyString(const char* chars, int length);

@@ -11,6 +11,7 @@ add_executable(clox
         src/headers/compiler.h
         src/headers/debug.h
         src/headers/memory.h
+        src/headers/object.h
         src/headers/scanner.h
         src/headers/value.h
         src/headers/vm.h
@@ -18,8 +19,8 @@ add_executable(clox
         src/clox.c
         src/compiler.c
         src/debug.c
+        src/memory.c
         src/scanner.c
         src/value.c
         src/vm.c
-        src/headers/object.h
         src/object.c)
