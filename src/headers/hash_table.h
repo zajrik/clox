@@ -18,7 +18,9 @@ void initTable(Table* table);
 void freeTable(Table* table);
 
 bool tableSet(Table* table, ObjString* key, Value value);
-Value tableGet(Table* table, ObjString* key);
+void tableAddAll(const Table* from, Table* to);
+bool tableGet(const Table* table, const ObjString* key, Value* valuePtr);
+bool tableDelete(const Table* table, const ObjString* key);
 
 static Entry* findEntry(Entry* entries, int capacity, const ObjString* key);
 

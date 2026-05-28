@@ -25,6 +25,8 @@ void freeTable(Table* table) {
 ///
 /// Existing entries will be re-inserted.
 static void expandTable(Table* table, const int capacity) {
+  table->count = 0;
+
   // Allocate a new entries array
   Entry* entries = ALLOCATE(Entry, capacity);
   for (int i = 0; i < capacity; i++) {
@@ -40,6 +42,7 @@ static void expandTable(Table* table, const int capacity) {
     Entry* dest = findEntry(entries, capacity, entry->key);
     dest->key = entry->key;
     dest->value = entry->value;
+    table->count++;
   }
 
   FREE_ARRAY(Entry, table->entries, table->capacity);
@@ -50,9 +53,27 @@ static void expandTable(Table* table, const int capacity) {
 /// Find an [Entry] in the given table with the given [key].
 static Entry* findEntry(Entry* entries, const int capacity, const ObjString* key) {
   uint32_t index = key->hash % capacity;
+  Entry* tombstone = NULL;
+
   loop {
     Entry* entry = &entries[index];
-    if (entry->key == key || entry->key == NULL) return entry;
+
+    // If entry key is NULL but value is nil, it's an empty slot. If the value isn't
+    // nil then it's a tombstone, and we'll set that aside and move to the next
+    // slot.
+    //
+    // If we hit an empty slot again, but we have a tombstone set aside then the
+    // tombstone is a valid entry slot so we return the tombstone.
+    if (entry->key == NULL) {
+      if (IS_NIL(entry->value)) return tombstone ? : entry;
+      if (tombstone == NULL) tombstone = entry;
+    }
+
+    // Otherwise check if key matches and move on to the next slot if not.
+    else if (entry->key == key) {
+      return entry;
+    }
+
     index = (index + 1) % capacity;
   }
 }
@@ -65,10 +86,52 @@ bool tableSet(Table* table, ObjString* key, const Value value) {
 
   Entry* entry = findEntry(table->entries, table->capacity, key);
   const bool isNewKey = entry->key == NULL;
-  if (isNewKey) table->count++;
+
+  // Only increase count if we're not overwriting a tombstone
+  if (isNewKey && IS_NIL(entry->value)) table->count++;
 
   entry->key = key;
   entry->value = value;
 
   return isNewKey;
+}
+
+/// Add all entries from table [a] to table [b].
+void tableAddAll(const Table* from, Table* to) {
+  for (int i = 0; i < from->capacity; i++) {
+    const Entry* entryA = &from->entries[i];
+    if (entryA->key == NULL) continue;
+    tableSet(to, entryA->key, entryA->value);
+  }
+}
+
+/// Get a value from the given [table] by the given [key].
+///
+/// If the value exists it will be stored at the given [valuePtr].
+///
+/// Returns whether the key was found in the given table.
+bool tableGet(const Table* table, const ObjString* key, Value* valuePtr) {
+  if (table->count == 0) return false;
+
+  const Entry* entry = findEntry(table->entries, table->capacity, key);
+  if (entry->key == NULL) return false;
+
+  *valuePtr = entry->value;
+  return true;
+}
+
+/// Delete the value for the given [key] from the given [table] if it exists.
+///
+/// Returns whether the value existed and was deleted.
+bool tableDelete(const Table* table, const ObjString* key) {
+  if (table->count == 0) return false;
+
+  Entry* entry = findEntry(table->entries, table->capacity, key);
+  if (entry->key == NULL) return false;
+
+  // Leave tombstone value in this entry slot.
+  entry->key = NULL;
+  entry->value = BOOL_VAL(true);
+
+  return true;
 }
