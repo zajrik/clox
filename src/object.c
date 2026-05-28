@@ -42,6 +42,10 @@ ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
   string->length = length;
   string->chars = chars;
   string->hash = hash;
+
+  // Intern newly allocated string
+  tableSet(&vm.strings, string, NIL_VAL);
+
   return string;
 }
 
@@ -53,12 +57,37 @@ ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
 /// Constant c-strings must be copied to ensure programs can't free memory used
 /// by the original compile-time constant strings.
 ObjString* copyString(const char* chars, const int length) {
+  const uint32_t hash = hashString(chars, length);
+
+  // Check for matching interned string before allocating a new one
+  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  if (interned != NULL) return interned;
+
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
   heapChars[length] = '\0';
 
-  const uint32_t hash = hashString(heapChars, length);
   return allocateString(heapChars, length, hash);
+}
+
+/// Take ownership of the given string data, allocating a new [ObjString] to
+/// wrap it.
+///
+/// This should only be used for strings created dynamically at runtime since we
+/// know the memory for those strings is safe to manipulate. Use [copyString] to
+/// create a safe copy of a compile-time constant string.
+///
+/// Returns a pointer to the new [ObjString].
+ObjString* takeString(char* chars, const int length) {
+  const uint32_t hash = hashString(chars, length);
+
+  // Check for matching interned string before allocating a new one
+  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  if (interned != NULL) {
+    FREE_ARRAY(char, chars, length + 1);
+    return interned;
+  }
+  return allocateString(chars, length, hash);
 }
 
 /// Print the given lox object value.

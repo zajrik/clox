@@ -34,10 +34,12 @@ Vm vm;
 void initVm() {
   resetStack();
   vm.objects = NULL;
+  initTable(&vm.strings);
 }
 
 /// Free resources used by the virtual machine. (eventually)
 void freeVm() {
+  freeTable(&vm.strings);
   freeObjects();
 }
 
@@ -87,11 +89,7 @@ static void concatenate() {
   memcpy(chars + a->length, b->chars, b->length);
   chars[length] = '\0';
 
-  freeObject((Obj*)b);
-  freeObject((Obj*)a);
-
-  const uint32_t hash = hashString(chars, length);
-  push(OBJ_VAL(allocateString(chars, length, hash)));
+  push(OBJ_VAL(takeString(chars, length)));
 }
 
 /// Interpret the given lox source code text.

@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "value.h"
+#include "hash_table.h"
 
 #define STACK_MAX 256
 
@@ -19,6 +20,12 @@ typedef struct Vm {
 
   /// Pointer to the top of the stack, where the next item will be inserted.
   Value* stackTop;
+
+  /// Hash-table of interned strings, used to ensure any allocated string exists
+  /// only once. When a string is produced, we'll check here for it first and
+  /// return a pointer to the existing interned string if it exists before allocating
+  /// a new string.
+  Table strings;
 
   /// Linked list of allocated lox objects.
   Obj* objects;

@@ -128,9 +128,9 @@ static void expression() {
 /// Parses a keyword-literal expression, emitting the relevant opcode.
 static void literal() {
   switch (parser.current.type) {
-    case TOKEN_NIL: DO(emitByte(OP_NIL));
-    case TOKEN_TRUE: DO(emitByte(OP_TRUE));
-    case TOKEN_FALSE: DO(emitByte(OP_FALSE));
+    case TOKEN_NIL: return emitByte(OP_NIL);
+    case TOKEN_TRUE: return emitByte(OP_TRUE);
+    case TOKEN_FALSE: return emitByte(OP_FALSE);
     default: break;
   }
 }
@@ -158,8 +158,8 @@ static void unary() {
 
   // Emit the operator opcode
   switch (operatorType) {
-    case TOKEN_MINUS: DO(emitByte(OP_NEGATE));
-    case TOKEN_BANG: DO(emitByte(OP_NOT));
+    case TOKEN_MINUS: return emitByte(OP_NEGATE);
+    case TOKEN_BANG: return emitByte(OP_NOT);
     default: break;
   }
 }

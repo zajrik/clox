@@ -33,6 +33,7 @@ struct ObjString {
 
 uint32_t hashString(const char* string, int length);
 ObjString* copyString(const char* chars, int length);
+ObjString* takeString(char* chars, int length);
 ObjString* allocateString(char* chars, int length, uint32_t hash);
 Obj* allocateObject(size_t size, ObjType type);
 

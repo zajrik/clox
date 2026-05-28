@@ -48,18 +48,8 @@ bool valuesEqual(const Value a, const Value b) {
     case VAL_NIL: return true;
     case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
     case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
-    case VAL_OBJ: {
-      const ObjString* aString = AS_STRING(a);
-      const ObjString* bString = AS_STRING(b);
-
-      // Compare full string bytes for now. If I had to guess, the book will have
-      // me implement char-by-char comparison with early exit on mismatched chars?
-      return aString->length == bString->length
-        && memcmp(aString->chars, bString->chars, aString->length) == 0;
-    }
-
-    // Reference equality
-    default: return &a == &b;
+    case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
+    default: return false;
   }
 }
 

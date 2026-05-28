@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "headers/hash_table.h"
 #include "headers/common.h"
 #include "headers/memory.h"
@@ -69,10 +71,10 @@ static Entry* findEntry(Entry* entries, const int capacity, const ObjString* key
       if (tombstone == NULL) tombstone = entry;
     }
 
-    // Otherwise check if key matches and move on to the next slot if not.
-    else if (entry->key == key) {
-      return entry;
-    }
+    // Otherwise check if key matches and move on to the next slot if not. Thanks
+    // to string interning via the vm.strings table, string objects are guaranteed
+    // to point to the same location in memory, so this comparison is safe.
+    else if (entry->key == key) return entry;
 
     index = (index + 1) % capacity;
   }
@@ -80,7 +82,7 @@ static Entry* findEntry(Entry* entries, const int capacity, const ObjString* key
 
 /// Set a [value] in the given [table] under the given [key].
 bool tableSet(Table* table, ObjString* key, const Value value) {
-  if (table->count + 1 < table->capacity * TABLE_MAX_LOAD) {
+  if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     expandTable(table, GROW_CAPACITY(table->capacity));
   }
 
@@ -134,4 +136,33 @@ bool tableDelete(const Table* table, const ObjString* key) {
   entry->value = BOOL_VAL(true);
 
   return true;
+}
+
+/// Find a string key from the given [table] matching the given string data.
+///
+/// Returns a pointer to the string object, or `NULL` if it was not found.
+ObjString* tableFindString(const Table* table, const char* chars, const int length, const uint32_t hash) {
+  if (table->count == 0) return NULL;
+
+  uint32_t index = hash % table->capacity;
+  loop {
+    const Entry* entry = &table->entries[index];
+
+    // If the entry is empty, continue if it's a tombstone, otherwise return null
+    // because this indicates that the string does not exist in the table
+    if (entry->key == NULL) {
+      if (IS_NIL(entry->value)) return NULL;
+      index = (index + 1) % table->capacity;
+      continue;
+    }
+
+    const bool stringsEqual = entry->key->length == length
+      && entry->key->hash == hash
+      && memcmp(entry->key->chars, chars, length) == 0;
+
+    // If the strings match, return the string key
+    if (stringsEqual) return entry->key;
+
+    index = (index + 1) % table->capacity;
+  }
 }
