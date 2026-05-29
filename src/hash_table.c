@@ -81,6 +81,8 @@ static Entry* findEntry(Entry* entries, const int capacity, const ObjString* key
 }
 
 /// Set a [value] in the given [table] under the given [key].
+///
+/// Returns whether the key existed before this value was set.
 bool tableSet(Table* table, ObjString* key, const Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     expandTable(table, GROW_CAPACITY(table->capacity));

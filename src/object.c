@@ -87,6 +87,7 @@ ObjString* takeString(char* chars, const int length) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;
   }
+  
   return allocateString(chars, length, hash);
 }
 

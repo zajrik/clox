@@ -37,9 +37,9 @@ typedef enum Precedence {
   PREC_PRIMARY,
 } Precedence;
 
-/// Represents a pointer to a void function accepting no arguments, to be used
-/// for parsing a grammar production from source tokens.
-typedef void (*ParseFn)();
+/// Represents a pointer to a void function accepting a single `bool` argument,
+/// to be used for parsing a grammar production from source tokens.
+typedef void (*ParseFn)(bool);
 
 /// Represents a single row in the parser rule table.
 typedef struct ParseRule {
@@ -58,22 +58,38 @@ bool compile(const char* source, Chunk* chunk);
 static void endCompilation();
 
 static void advance();
+static TokenType currentType();
+static bool currentIs(TokenType type);
+static TokenType nextType();
+static bool nextIs(TokenType type);
+static bool nextMatches(TokenType type);
 static void consume(TokenType type, const char* msg);
 
-static uint8_t makeConstant(Value value);
+static uint8_t parseVariable(const char* expect);
+static void defineVariable(uint8_t global);
+
+static void declaration();
+static void statement();
+static void variableDeclaration();
+static void expressionStatement();
+static void printStatement();
 
 static void expr(Precedence precedence);
 
 static void expression();
-static void literal();
-static void string();
-static void number();
-static void unary();
-static void binary();
-static void grouping();
+static void unary(bool);
+static void binary(bool);
+static void literal(bool);
+static void number(bool);
+static void string(bool);
+static void variable(bool canAssign);
+static void namedVariable(Token token, bool canAssign);
+static void grouping(bool);
 
 static ParseRule* getRule(TokenType type);
 
+static uint8_t makeConstant(Value value);
+static uint8_t identifierConstant(const Token* token);
 static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
@@ -81,5 +97,6 @@ static void emitReturn();
 
 static void errorAtNext(const char* msg);
 static void error(const char* msg);
+static void synchronize();
 
 #endif

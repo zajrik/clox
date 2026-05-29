@@ -27,6 +27,9 @@ typedef struct Vm {
   /// a new string.
   Table strings;
 
+  /// Hash-table of all global-scoped program variables.
+  Table globals;
+
   /// Linked list of allocated lox objects.
   Obj* objects;
 } Vm;

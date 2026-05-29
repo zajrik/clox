@@ -48,6 +48,16 @@ typedef enum OpCode {
   /// Pop one operand off stack, negate it, push result to stack.
   OP_NEGATE,
 
+  /// Pop the top value off of the stack, discarding it.
+  OP_POP,
+
+  /// Pop the top value off of the stack, printing it.
+  OP_PRINT,
+
+  OP_DEFINE_GLOBAL,
+  OP_SET_GLOBAL,
+  OP_GET_GLOBAL,
+
   /// Return something eventually.
   OP_RETURN,
 } OpCode;

@@ -15,6 +15,9 @@
 /// Read the constant value at the offset obtained by reading the next byte.
 #define READ_CONSTANT() vm.chunk->constants.values[READ_BYTE()]
 
+/// Read the string constant value at the offset obtained by reading the next byte.
+#define READ_STRING() AS_STRING(READ_CONSTANT())
+
 /// Perform a binary operation using the top two values off the top of the stack,
 /// pushing the result of the operation back onto the stack.
 #define BINARY_OP(valueType, op) do { \
@@ -35,11 +38,13 @@ void initVm() {
   resetStack();
   vm.objects = NULL;
   initTable(&vm.strings);
+  initTable(&vm.globals);
 }
 
 /// Free resources used by the virtual machine. (eventually)
 void freeVm() {
   freeTable(&vm.strings);
+  freeTable(&vm.globals);
   freeObjects();
 }
 
@@ -175,9 +180,47 @@ static InterpretResult run() {
         push(NUMBER_VAL(-AS_NUMBER(pop())));
         break;
 
-      case OP_RETURN:
+      case OP_POP: DO(pop());
+
+      case OP_DEFINE_GLOBAL: {
+        ObjString* name = READ_STRING();
+        tableSet(&vm.globals, name, peek(0));
+        pop();
+        break;
+      }
+
+      case OP_SET_GLOBAL: {
+        ObjString* name = READ_STRING();
+        if (tableSet(&vm.globals, name, peek(0))) {
+          tableDelete(&vm.globals, name);
+          runtimeError("Undefined variable '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        break;
+      }
+
+      case OP_GET_GLOBAL: {
+        // Get global variable name from constants via offset operand
+        const ObjString* name = READ_STRING();
+
+        // Get value from globals table
+        Value value;
+        if (!tableGet(&vm.globals, name, &value)) {
+          runtimeError("Undefined variable '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        push(value);
+        break;
+      }
+
+      case OP_PRINT:
         printValue(pop());
         printf("\n");
+        break;
+
+      case OP_RETURN:
+        // Exit interpreter
         return INTERPRET_OK;
 
       default:
@@ -207,4 +250,5 @@ static void runtimeError(const char* format, ...) {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
