@@ -59,6 +59,9 @@ typedef enum OpCode {
   OP_SET_GLOBAL,
   OP_GET_GLOBAL,
 
+  OP_SET_LOCAL,
+  OP_GET_LOCAL,
+
   /// Return something eventually.
   OP_RETURN,
 } OpCode;

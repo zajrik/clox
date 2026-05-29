@@ -19,6 +19,17 @@ typedef struct Parser {
   bool panicMode;
 } Parser;
 
+typedef struct Local {
+  Token identifier;
+  int depth;
+} Local;
+
+typedef struct Compiler {
+  Local locals[UINT8_COUNT];
+  int localCount;
+  int scopeDepth;
+} Compiler;
+
 /// Indicates the level of precedence with which to parse and compile an expression.
 ///
 /// Enum member order is significant here and reflects the actual grammar rule
@@ -38,16 +49,20 @@ typedef enum Precedence {
 } Precedence;
 
 /// Represents a pointer to a void function accepting a single `bool` argument,
-/// to be used for parsing a grammar production from source tokens.
-typedef void (*ParseFn)(bool);
+/// to be used for parsing an expression grammar production from source tokens.
+typedef void (*ExprFn)(bool);
+
+/// Represents a pointer to a void function accepting no arguments, to be used
+/// for parsing a statement grammar production from source tokens.
+typedef void (*StmtFn)();
 
 /// Represents a single row in the parser rule table.
 typedef struct ParseRule {
   /// Pointer to a prefix-position parse function.
-  ParseFn prefix;
+  ExprFn prefix;
 
   /// Pointer to an infix-position parse function.
-  ParseFn infix;
+  ExprFn infix;
 
   /// The expression precedence with which to apply this rule when parsing.
   Precedence precedence;
@@ -56,6 +71,9 @@ typedef struct ParseRule {
 bool compile(const char* source, Chunk* chunk);
 
 static void endCompilation();
+static void pushScope();
+static void popScope();
+static void scope(StmtFn rule);
 
 static void advance();
 static TokenType currentType();
@@ -69,10 +87,11 @@ static uint8_t parseVariable(const char* expect);
 static void defineVariable(uint8_t global);
 
 static void declaration();
-static void statement();
 static void variableDeclaration();
+static void statement();
 static void expressionStatement();
 static void printStatement();
+static void block();
 
 static void expr(Precedence precedence);
 
@@ -90,6 +109,11 @@ static ParseRule* getRule(TokenType type);
 
 static uint8_t makeConstant(Value value);
 static uint8_t identifierConstant(const Token* token);
+static bool identifiersEqual(const Token* a, const Token* b);
+static int resolveLocal(const Compiler* cmp, const Token* identifier);
+static void declareVariable();
+static void addLocal(Token identifier);
+
 static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);

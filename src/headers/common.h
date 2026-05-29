@@ -10,6 +10,8 @@
 #define DEBUG_PRINT_CODE
 #define DEBUG_TRACE_EXECUTION
 
+#define UINT8_COUNT (UINT8_MAX + 1)
+
 /// Switch case macro to clean up single-statement, non-returning cases requiring
 /// a break statement.
 ///

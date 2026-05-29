@@ -1,4 +1,7 @@
 ﻿#include "headers/compiler.h"
+
+#include <string.h>
+
 #include "headers/chunk.h"
 #include "headers/common.h"
 #include "headers/object.h"
@@ -10,6 +13,16 @@
 
 /// Global parser instance.
 Parser parser;
+
+/// Pointer to the current compiler (?)
+Compiler* compiler = NULL;
+
+/// Initialize the given [compiler] instance.
+static void initCompiler(Compiler* cmp) {
+  cmp->localCount = 0;
+  cmp->scopeDepth = 0;
+  compiler = cmp;
+}
 
 /// Stores a pointer to the currently compiling chunk.
 Chunk* compilingChunk;
@@ -25,6 +38,11 @@ static Chunk* currentChunk() {
 /// Returns whether compilation was successful.
 bool compile(const char* source, Chunk* chunk) {
   initScanner(source);
+
+  Compiler cmp;
+  // ReSharper disable once CppDFALocalValueEscapesFunction
+  initCompiler(&cmp);
+
   compilingChunk = chunk;
 
   parser.hadError = false;
@@ -53,6 +71,31 @@ static void endCompilation() {
     printf("errors occurred\n");
   }
   #endif
+}
+
+/// Begin a new scope.
+void pushScope() {
+  compiler->scopeDepth++;
+}
+
+/// End the current scope.
+void popScope() {
+  compiler->scopeDepth--;
+
+  while (compiler->localCount > 0
+    && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
+    emitByte(OP_POP);
+    compiler->localCount--;
+  }
+}
+
+/// Execute the given statement rule within a new scope.
+///
+/// The scope will be popped when the rule completes.
+void scope(const StmtFn rule) {
+  pushScope();
+  rule();
+  popScope();
 }
 
 /// Advance the parser, consuming the current token and scanning the next token.
@@ -107,6 +150,8 @@ static void consume(const TokenType type, const char* msg) {
 /// If the variable identifier cannot be parsed, errors with message [expect].
 static uint8_t parseVariable(const char* expect) {
   consume(TOKEN_IDENTIFIER, expect);
+  declareVariable();
+  if (compiler->scopeDepth > 0) return 0;
   return identifierConstant(&parser.current);
 }
 
@@ -114,6 +159,7 @@ static uint8_t parseVariable(const char* expect) {
 ///
 /// The given [global] constant value index will be emitted as the operand.
 static void defineVariable(const uint8_t global) {
+  if (compiler->scopeDepth > 0) return;
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
@@ -143,10 +189,27 @@ static void variableDeclaration() {
 
 /// Parses/compiles a statement from scanned tokens.
 ///
-/// statement := exprStmt | printStmt ;
+/// statement := exprStmt | printStmt | block ;
 static void statement() {
-  if (nextMatches(TOKEN_PRINT)) return printStatement();
-  expressionStatement();
+  if (nextMatches(TOKEN_PRINT)) {
+    printStatement();
+  } else if (nextMatches(TOKEN_LEFT_BRACE)) {
+    scope(block);
+    // pushScope();
+    // block();
+    // popScope();
+  } else {
+    expressionStatement();
+  }
+}
+
+/// Parses/compiles an expression statement from scanned tokens.
+///
+/// exprStmt := expression ";" ;
+static void expressionStatement() {
+  expression();
+  consume(TOKEN_SEMICOLON, "Expected ';' after expression.");
+  emitByte(OP_POP);
 }
 
 /// Parses/compiles a print statement from scanned tokens.
@@ -158,13 +221,14 @@ static void printStatement() {
   emitByte(OP_PRINT);
 }
 
-/// Parses/compiles an expression statement from scanned tokens.
+/// Parses/compiles a block statement from scanned tokens.
 ///
-/// exprStmt := expression ";" ;
-static void expressionStatement() {
-  expression();
-  consume(TOKEN_SEMICOLON, "Expected ';' after expression.");
-  emitByte(OP_POP);
+/// block := "{" declaration* "}" ;
+static void block() {
+  while (!nextIs(TOKEN_RIGHT_BRACE) && !nextIs(TOKEN_EOF)) {
+    declaration();
+  }
+  consume(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
 }
 
 // Expression parse/compilation functions =====================================
@@ -186,7 +250,7 @@ static void expr(const Precedence precedence) {
   // (1 + 1); // grouping is a prefix rule
   // -1 + 1); // unary minus is a prefix rule
 
-  const ParseFn prefixRule = getRule(currentType())->prefix;
+  const ExprFn prefixRule = getRule(currentType())->prefix;
   if (prefixRule == NULL) return error("Expected expression.");
   prefixRule(canAssign);
 
@@ -291,14 +355,24 @@ static void variable(const bool canAssign) {
 /// Parses/compiles a variable/identifier get/set expression, emitting bytecode
 /// to fetch/set the value for that variable/identifier.
 static void namedVariable(const Token token, const bool canAssign) {
-  const uint8_t identOffset = identifierConstant(&token);
+  uint8_t getOp, setOp;
+
+  int varOffset = resolveLocal(compiler, &token);
+  if (varOffset != -1) {
+    getOp = OP_GET_LOCAL;
+    setOp = OP_SET_LOCAL;
+  } else {
+    varOffset = identifierConstant(&token);
+    getOp = OP_GET_GLOBAL;
+    setOp = OP_SET_GLOBAL;
+  }
 
   if (canAssign && nextMatches(TOKEN_EQUAL)) {
     expression();
-    return emitBytes(OP_SET_GLOBAL, identOffset);
+    return emitBytes(setOp, (uint8_t)varOffset);
   }
 
-  emitBytes(OP_GET_GLOBAL, identOffset);
+  emitBytes(getOp, (uint8_t)varOffset);
 }
 
 /// Parses a grouping expression, emitting bytecode for the grouped expression.
@@ -311,56 +385,56 @@ static void grouping(const bool _) {
 /// Table holding token parse rules.
 static ParseRule rules[] = {
   // Single character token rules
-  // [TokenType]        = {prefix,     infix,  Precedence      },
-  [TOKEN_LEFT_PAREN]    = {grouping,   NULL,   PREC_NONE       },
-  [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_LEFT_BRACE]    = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_COMMA]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_DOT]           = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_SEMICOLON]     = {NULL,       NULL,   PREC_NONE       },
+  // [TokenType]        = {prefix,     infix,    Precedence      },
+  [TOKEN_LEFT_PAREN]    = {grouping,   NULL,     PREC_NONE       },
+  [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_LEFT_BRACE]    = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_COMMA]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_DOT]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_SEMICOLON]     = {NULL,       NULL,     PREC_NONE       },
 
   // One/two character token rules
-  [TOKEN_MINUS]         = {unary,      binary, PREC_TERM       },
-  [TOKEN_PLUS]          = {NULL,       binary, PREC_TERM       },
-  [TOKEN_SLASH]         = {NULL,       binary, PREC_FACTOR     },
-  [TOKEN_STAR]          = {NULL,       binary, PREC_FACTOR     },
+  [TOKEN_MINUS]         = {unary,      binary,   PREC_TERM       },
+  [TOKEN_PLUS]          = {NULL,       binary,   PREC_TERM       },
+  [TOKEN_SLASH]         = {NULL,       binary,   PREC_FACTOR     },
+  [TOKEN_STAR]          = {NULL,       binary,   PREC_FACTOR     },
 
-  [TOKEN_BANG]          = {unary,      NULL,   PREC_NONE       },
-  [TOKEN_BANG_EQUAL]    = {NULL,       binary, PREC_EQUALITY   },
-  [TOKEN_EQUAL]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_EQUAL_EQUAL]   = {NULL,       binary, PREC_EQUALITY   },
-  [TOKEN_GREATER]       = {NULL,       binary, PREC_COMPARISON },
-  [TOKEN_GREATER_EQUAL] = {NULL,       binary, PREC_COMPARISON },
-  [TOKEN_LESS]          = {NULL,       binary, PREC_COMPARISON },
-  [TOKEN_LESS_EQUAL]    = {NULL,       binary, PREC_COMPARISON },
+  [TOKEN_BANG]          = {unary,      NULL,     PREC_NONE       },
+  [TOKEN_BANG_EQUAL]    = {NULL,       binary,   PREC_EQUALITY   },
+  [TOKEN_EQUAL]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_EQUAL_EQUAL]   = {NULL,       binary,   PREC_EQUALITY   },
+  [TOKEN_GREATER]       = {NULL,       binary,   PREC_COMPARISON },
+  [TOKEN_GREATER_EQUAL] = {NULL,       binary,   PREC_COMPARISON },
+  [TOKEN_LESS]          = {NULL,       binary,   PREC_COMPARISON },
+  [TOKEN_LESS_EQUAL]    = {NULL,       binary,   PREC_COMPARISON },
 
   // Literal token rules
-  [TOKEN_IDENTIFIER]    = {variable,   NULL,   PREC_NONE       },
-  [TOKEN_STRING]        = {string,     NULL,   PREC_NONE       },
-  [TOKEN_NUMBER]        = {number,     NULL,   PREC_NONE       },
+  [TOKEN_IDENTIFIER]    = {variable,   NULL,     PREC_NONE       },
+  [TOKEN_STRING]        = {string,     NULL,     PREC_NONE       },
+  [TOKEN_NUMBER]        = {number,     NULL,     PREC_NONE       },
 
   // Keyword token rules
-  [TOKEN_AND]           = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_CLASS]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_ELSE]          = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_FALSE]         = {literal,    NULL,   PREC_NONE       },
-  [TOKEN_FOR]           = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_FUN]           = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_IF]            = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_NIL]           = {literal,    NULL,   PREC_NONE       },
-  [TOKEN_OR]            = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_PRINT]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_RETURN]        = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_SUPER]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_THIS]          = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_TRUE]          = {literal,    NULL,   PREC_NONE       },
-  [TOKEN_VAR]           = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_WHILE]         = {NULL,       NULL,   PREC_NONE       },
+  [TOKEN_AND]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_CLASS]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_ELSE]          = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_FALSE]         = {literal,    NULL,     PREC_NONE       },
+  [TOKEN_FOR]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_FUN]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_IF]            = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_NIL]           = {literal,    NULL,     PREC_NONE       },
+  [TOKEN_OR]            = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_PRINT]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_RETURN]        = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_SUPER]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_THIS]          = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_TRUE]          = {literal,    NULL,     PREC_NONE       },
+  [TOKEN_VAR]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_WHILE]         = {NULL,       NULL,     PREC_NONE       },
 
   // Misc token rules
-  [TOKEN_ERROR]         = {NULL,       NULL,   PREC_NONE       },
-  [TOKEN_EOF]           = {NULL,       NULL,   PREC_NONE       },
+  [TOKEN_ERROR]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_EOF]           = {NULL,       NULL,     PREC_NONE       },
 };
 // @formatter:on
 
@@ -388,6 +462,56 @@ static uint8_t makeConstant(const Value value) {
 /// Push an identifier to the constants array, returning the offset of the constant.
 static uint8_t identifierConstant(const Token* token) {
   return makeConstant(OBJ_VAL(copyString(token->start, token->length)));
+}
+
+/// Returns whether the given identifier tokens are equal.
+static bool identifiersEqual(const Token* a, const Token* b) {
+  if (a->length != b->length) return false;
+  return memcmp(a->start, b->start, a->length) == 0;
+}
+
+/// Returns the local variable offset of the given variable [identifier] if it exists.
+///
+/// Returns `-1` if it does not exist.
+static int resolveLocal(const Compiler* cmp, const Token* identifier) {
+  for (int i = cmp->localCount - 1; i >= 0; i--) {
+    const Local* local = &cmp->locals[i];
+    if (identifiersEqual(identifier, &local->identifier)) return i;
+  }
+
+  return -1;
+}
+
+/// Declare a variable in the current scope with the current token as its identifier.
+static void declareVariable() {
+  if (compiler->scopeDepth > 0) return;
+
+  const Token* identifier = &parser.current;
+
+  for (int i = compiler->scopeDepth - 1; i >= 0; i--) {
+    const Local* local = &compiler->locals[i];
+
+    if (local->depth != -1 && local->depth < compiler->scopeDepth) {
+      break;
+    }
+
+    if (identifiersEqual(identifier, &local->identifier)) {
+      error("A variable with this name already exists in this scope.");
+    }
+  }
+
+  addLocal(*identifier);
+}
+
+/// Add a local in the current scope with the given [identifier].
+static void addLocal(const Token identifier) {
+  if (compiler->localCount == UINT8_COUNT) {
+    return error("Too many local variables in function.");
+  }
+
+  Local* local = &compiler->locals[compiler->localCount++];
+  local->identifier = identifier;
+  local->depth = compiler->scopeDepth;
 }
 
 /// Write the given [byte] to the chunk currently being compiled.

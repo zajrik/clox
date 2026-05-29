@@ -182,6 +182,34 @@ static InterpretResult run() {
 
       case OP_POP: DO(pop());
 
+      // Local variable get expression op. Reads the local variable from its stack
+      // slot (obtained from the operand) and pushes it to the top of stack.
+      //
+      // The variable's value already exists on the stack in the slot from when it
+      // was declared, which will be modified in-place by OP_SET_LOCAL and will stay on
+      // the stack until the local goes out of scope.
+      //
+      // In contrast, the value we're pushing to the top of the stack here is the
+      // result of variable get expression and will be consumed by the enclosing
+      // expression (or discarded
+      case OP_GET_LOCAL: DO(push(vm.stack[READ_BYTE()]));
+      // case OP_GET_LOCAL: {
+      //   const uint8_t slot = READ_BYTE();
+      //   push(vm.stack[slot]);
+      //   break;
+      // }
+
+      // Local variable set expression op. Assigns the value at the top of the stack
+      // to the stack slot where the local variable lives (obtained from the operand).
+      //
+      // The stack-top value stays because it is also the result of the assignment
+      // expression and will be popped when consumed by further expressions (or at
+      // the end of the statement if the assignment is an expression statement)
+      case OP_SET_LOCAL: DO(vm.stack[READ_BYTE()] = peek(0));
+
+      // Global variable declaration statement expression op. Assigns the value at
+      // the top of the stack to the global variable obtained from the operand.
+      // The value will be popped off of the stack
       case OP_DEFINE_GLOBAL: {
         ObjString* name = READ_STRING();
         tableSet(&vm.globals, name, peek(0));
@@ -189,6 +217,8 @@ static InterpretResult run() {
         break;
       }
 
+      // Global variable set expression op, leaves value on the stack for the same
+      // reasons described in the notes for OP_SET_LOCAL above
       case OP_SET_GLOBAL: {
         ObjString* name = READ_STRING();
         if (tableSet(&vm.globals, name, peek(0))) {
