@@ -124,6 +124,12 @@ bool tableGet(const Table* table, const ObjString* key, Value* valuePtr) {
   return true;
 }
 
+/// Returns whether the given [table] has the given [key].
+bool tableHasKey(const Table* table, const ObjString* key) {
+  if (table->count == 0) return false;
+  return findEntry(table->entries, table->capacity, key)->key != NULL;
+}
+
 /// Delete the value for the given [key] from the given [table] if it exists.
 ///
 /// Returns whether the value existed and was deleted.

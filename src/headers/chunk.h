@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "value.h"
+#include "hash_table.h"
 
 /// An instruction opcode to be executed by the lox virtual machine.
 typedef enum OpCode {
@@ -86,6 +87,10 @@ typedef struct Chunk {
   /// To be accessed by [OP_CONSTANT] instructions consuming offset operands
   /// pointing to the constant in the array.
   ValueArray constants;
+
+  /// Hash-table of interned compile-time string constants, used to eliminate
+  /// insertion of duplicate string entries into the constants array.
+  Table strings;
 } Chunk;
 
 void initChunk(Chunk* chunk);

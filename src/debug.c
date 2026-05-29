@@ -10,6 +10,12 @@ void disassembleChunk(const Chunk* chunk, const char* name) {
   for (int offset = 0; offset < chunk->count;) {
     offset = disassembleInstruction(chunk, offset);
   }
+
+  for (int i = 0; i < chunk->constants.count; i++) {
+    printf("Constant i: ");
+    printValue(chunk->constants.values[i]);
+    printf("\n");
+  }
 }
 
 /// Prints the instruction from the chunk at address [chunk], at [offset] in the
