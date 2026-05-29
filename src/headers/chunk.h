@@ -90,6 +90,8 @@ typedef struct Chunk {
 
   /// Hash-table of interned compile-time string constants, used to eliminate
   /// insertion of duplicate string entries into the constants array.
+  ///
+  /// Maps string value to offset within the constants array.
   Table strings;
 } Chunk;
 

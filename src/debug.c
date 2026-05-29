@@ -12,7 +12,7 @@ void disassembleChunk(const Chunk* chunk, const char* name) {
   }
 
   for (int i = 0; i < chunk->constants.count; i++) {
-    printf("Constant i: ");
+    printf("Constant %d: ", i);
     printValue(chunk->constants.values[i]);
     printf("\n");
   }

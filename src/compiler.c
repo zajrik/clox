@@ -110,6 +110,9 @@ static uint8_t parseVariable(const char* expect) {
   return identifierConstant(&parser.current);
 }
 
+/// Emit bytecode to define a global variable.
+///
+/// The given [global] constant value index will be emitted as the operand.
 static void defineVariable(const uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
