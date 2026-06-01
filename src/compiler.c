@@ -180,10 +180,12 @@ static void variableDeclaration() {
 
 /// Parses/compiles a statement from scanned tokens.
 ///
-/// statement := exprStmt | printStmt | block ;
+/// statement := exprStmt | printStmt | ifStmt | block ;
 static void statement() {
   if (nextMatches(TOKEN_PRINT)) {
     printStatement();
+  } else if (nextMatches(TOKEN_IF)) {
+    ifStatement();
   } else if (nextMatches(TOKEN_LEFT_BRACE)) {
     scope(block);
   } else {
@@ -207,6 +209,37 @@ static void printStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expected ';' after value.");
   emitByte(OP_PRINT);
+}
+
+/// Parses/compiles an if statement from scanned tokens.
+///
+/// ifStmt := "if" "(" expression ")" statement ( "else" statement )? ;
+static void ifStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after 'if'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+
+  // Emit OP_JUMP_IF_FALSE to jump over then-branch if condition is false. We emit
+  // an OP_POP to pop the value left on the stack by the condition expression and
+  // then compile the then-branch statement. These will be executed if the condition
+  // is not false
+  const int thenJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+
+  // Emit OP_JUMP to jump over else-branch if we reach this instruction. This keeps
+  // the then-branch from falling through to the else-branch. We then patch thenJump
+  // to jump over the OP_JUMP, followed by an OP_POP for the else-branch to pop
+  // the value left on the stack by the condition expression if the then-branch
+  // was jumped over
+  const int elseJump = emitJump(OP_JUMP);
+  patchJump(thenJump);
+  emitByte(OP_POP);
+
+  if (nextMatches(TOKEN_ELSE)) statement();
+
+  // Patch elseJump to the end of the if-statement bytecode
+  patchJump(elseJump);
 }
 
 /// Parses/compiles a block statement from scanned tokens.
@@ -572,6 +605,23 @@ static void emitConstant(const Value value) {
 /// Write [OP_RETURN] to the chunk currently being compiled.
 static void emitReturn() {
   emitByte(OP_RETURN);
+}
+
+static int emitJump(const OpCode opcode) {
+  emitByte(opcode);
+  emitBytes(0xff, 0xff);
+  return currentChunk()->count - 2;
+}
+
+static void patchJump(const int offset) {
+  const int jumpOffset = currentChunk()->count - 2 - offset;
+  if (jumpOffset > UINT16_MAX) {
+    error("Jump offset is too large");
+  }
+
+  // Patch first and second bytes of the 2-byte jump instruction operand
+  currentChunk()->instructions[offset] = jumpOffset >> 8 & 0xff;
+  currentChunk()->instructions[offset + 1] = jumpOffset & 0xff;
 }
 
 // Error management ===========================================================

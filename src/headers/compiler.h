@@ -90,6 +90,7 @@ static void variableDeclaration();
 static void statement();
 static void expressionStatement();
 static void printStatement();
+static void ifStatement();
 static void block();
 
 static void expr(Precedence precedence);
@@ -119,6 +120,8 @@ static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
 static void emitReturn();
+static int emitJump(OpCode opcode);
+static void patchJump(int offset);
 
 static void errorAtNext(const char* msg);
 static void error(const char* msg);

@@ -2,8 +2,8 @@
 #define CLOX_CHUNK_H
 
 #include "common.h"
-#include "value.h"
 #include "hash_table.h"
+#include "value.h"
 
 /// An instruction opcode to be executed by the lox virtual machine.
 typedef enum OpCode {
@@ -64,6 +64,9 @@ typedef enum OpCode {
 
   OP_SET_LOCAL,
   OP_GET_LOCAL,
+
+  OP_JUMP_IF_FALSE,
+  OP_JUMP,
 
   /// Return something eventually.
   OP_RETURN,

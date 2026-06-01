@@ -62,6 +62,10 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_GET_GLOBAL: return constantInstruction("OP_GET_GLOBAL", chunk, offset);
 
     case OP_PRINT: return simpleInstruction("OP_PRINT", offset);
+
+    case OP_JUMP_IF_FALSE: return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+    case OP_JUMP: return jumpInstruction("OP_JUMP", 1, chunk, offset);
+      
     case OP_RETURN: return simpleInstruction("OP_RETURN", offset);
 
     default:
@@ -101,4 +105,17 @@ static int byteInstruction(const char* name, const Chunk* chunk, const int offse
   printf("%-16s %4d\n", name, byte);
 
   return offset + 2;
+}
+
+/// Print a jump instruction and its operand.
+static int jumpInstruction(
+  const char* name,
+  const int sign,
+  const Chunk* chunk,
+  const int offset
+) {
+  uint16_t jump = (uint16_t)(chunk->instructions[offset + 1] << 8);
+  jump |= chunk->instructions[offset + 2];
+  printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+  return offset + 3;
 }
