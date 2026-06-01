@@ -1,0 +1,13 @@
+var a = 123;
+{
+  var a = 456;
+  a = a + 123;
+  print a;
+}
+print a;
+{
+  var a = 789;
+  a = a + 1;
+  print a;
+}
+print a;
