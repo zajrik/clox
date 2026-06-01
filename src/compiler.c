@@ -484,11 +484,11 @@ static int resolveLocal(const Compiler* cmp, const Token* identifier) {
 
 /// Declare a variable in the current scope with the current token as its identifier.
 static void declareVariable() {
-  if (compiler->scopeDepth > 0) return;
+  if (compiler->scopeDepth == 0) return;
 
   const Token* identifier = &parser.current;
 
-  for (int i = compiler->scopeDepth - 1; i >= 0; i--) {
+  for (int i = compiler->localCount - 1; i >= 0; i--) {
     const Local* local = &compiler->locals[i];
 
     if (local->depth != -1 && local->depth < compiler->scopeDepth) {
