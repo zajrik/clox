@@ -73,6 +73,11 @@ Value pop() {
   return *--vm.stackTop;
 }
 
+/// Pop the top [n] values off of the stack, discarding them.
+void popN(const uint8_t n) {
+  vm.stackTop -= n;
+}
+
 /// Peek at a value in the stack, offset by [distance] from the top of the stack.
 static Value peek(const int distance) {
   return *(vm.stackTop - 1 - distance);
@@ -178,6 +183,7 @@ static InterpretResult run() {
         break;
 
       case OP_POP: DO(pop());
+      case OP_POP_N: DO(popN(READ_BYTE()));
 
       // Local variable get expression op. Reads the local variable from its stack
       // slot (obtained from the operand) and pushes it to the top of stack.

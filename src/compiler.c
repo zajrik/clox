@@ -134,12 +134,15 @@ void pushScope() {
 /// End the current scope.
 void popScope() {
   compiler->scopeDepth--;
+  uint8_t poppedLocals = 0;
 
   while (compiler->localCount > 0
     && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
-    emitByte(OP_POP);
     compiler->localCount--;
+    poppedLocals++;
   }
+
+  emitBytes(OP_POP_N, poppedLocals);
 }
 
 /// Execute the given statement rule within a new scope.

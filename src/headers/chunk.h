@@ -22,35 +22,38 @@ typedef enum OpCode {
   /// Push literal `false` onto the stack.
   OP_FALSE,
 
-  /// Pop two operands off stack, compare, push result to stack.
+  /// Pop two values off stack, compare, push result to stack.
   OP_EQUAL,
 
-  /// Pop two operands off stack, compare, push result to stack.
+  /// Pop two values off stack, compare, push result to stack.
   OP_GREATER,
 
-  /// Pop two operands off stack, compare, push result to stack.
+  /// Pop two values off stack, compare, push result to stack.
   OP_LESS,
 
-  /// Pop two operands off stack, add them, push result to stack.
+  /// Pop two values off stack, add them, push result to stack.
   OP_ADD,
 
-  /// Pop two operands off stack, subtract them, push result to the stack.
+  /// Pop two values off stack, subtract them, push result to the stack.
   OP_SUBTRACT,
 
-  /// Pop two operands off stack, multiply them, push result to stack.
+  /// Pop two values off stack, multiply them, push result to stack.
   OP_MULTIPLY,
 
-  /// Pop two operands off stack, divide them, push result to stack.
+  /// Pop two values off stack, divide them, push result to stack.
   OP_DIVIDE,
 
-  /// Pop boolean operand off stack, negate it, push result to stack.
+  /// Pop boolean values off stack, negate it, push result to stack.
   OP_NOT,
 
-  /// Pop one operand off stack, negate it, push result to stack.
+  /// Pop one value off stack, negate it, push result to stack.
   OP_NEGATE,
 
   /// Pop the top value off of the stack, discarding it.
   OP_POP,
+
+  /// Pop the top N values off of the stack, where N is the operand, discarding them.
+  OP_POP_N,
 
   /// Pop the top value off of the stack, printing it.
   OP_PRINT,
