@@ -98,6 +98,8 @@ static void expr(Precedence precedence);
 static void expression();
 static void unary(bool);
 static void binary(bool);
+static void and(bool);
+static void or(bool);
 static void literal(bool);
 static void number(bool);
 static void string(bool);

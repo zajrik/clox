@@ -66,7 +66,9 @@ typedef enum OpCode {
   OP_GET_LOCAL,
 
   OP_JUMP_IF_FALSE,
+  OP_JUMP_IF_TRUE,
   OP_JUMP,
+  OP_LOOP,
 
   /// Return something eventually.
   OP_RETURN,

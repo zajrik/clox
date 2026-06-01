@@ -320,7 +320,7 @@ static void unary(const bool _) {
 /// and the operator.
 ///
 /// The left-hand operand of the binary expression has already been compiled to
-/// the chunk at this point.
+/// the chunk at the point this will be called.
 static void binary(const bool _) {
   const TokenType operatorType = currentType();
   const ParseRule* operatorRule = getRule(operatorType);
@@ -342,6 +342,30 @@ static void binary(const bool _) {
     case TOKEN_SLASH: return emitByte(OP_DIVIDE);
     default: break;
   }
+}
+
+/// Compile an `and` operator expression.
+///
+/// The left-hand operand of the `and` expression has already been compiled to
+/// the chunk at the point this will be called.
+static void and(bool _) {
+  // The left-hand operand will be on the stack already for this jump op
+  const int end = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  expr(PREC_AND);
+  patchJump(end);
+}
+
+/// Compile an `or` operator expression.
+///
+/// The left-hand operand of the `or` expression has already been compiled to
+/// the chunk at the point this will be called.
+static void or(bool _) {
+  // The left-hand operand will be on the stack already for this jump op
+  const int end = emitJump(OP_JUMP_IF_TRUE);
+  emitByte(OP_POP);
+  expr(PREC_OR);
+  patchJump(end);
 }
 
 /// Parses a keyword-literal expression, emitting the relevant opcode.
@@ -435,7 +459,7 @@ static ParseRule rules[] = {
   [TOKEN_NUMBER]        = {number,     NULL,     PREC_NONE       },
 
   // Keyword token rules
-  [TOKEN_AND]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_AND]           = {NULL,       and,      PREC_AND        },
   [TOKEN_CLASS]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_ELSE]          = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_FALSE]         = {literal,    NULL,     PREC_NONE       },
@@ -443,7 +467,7 @@ static ParseRule rules[] = {
   [TOKEN_FUN]           = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_IF]            = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_NIL]           = {literal,    NULL,     PREC_NONE       },
-  [TOKEN_OR]            = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_OR]            = {NULL,       or,       PREC_OR         },
   [TOKEN_PRINT]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_RETURN]        = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SUPER]         = {NULL,       NULL,     PREC_NONE       },
