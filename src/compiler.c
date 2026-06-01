@@ -142,7 +142,7 @@ void popScope() {
     poppedLocals++;
   }
 
-  emitBytes(OP_POP_N, poppedLocals);
+  if (poppedLocals > 0) emitBytes(OP_POP_N, poppedLocals);
 }
 
 /// Execute the given statement rule within a new scope.
