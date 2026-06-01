@@ -71,20 +71,19 @@ typedef struct ParseRule {
 bool compile(const char* source, Chunk* chunk);
 
 static void endCompilation();
-static void pushScope();
-static void popScope();
-static void scope(StmtFn rule);
 
 static void advance();
+static void consume(TokenType type, const char* msg);
 static TokenType currentType();
 static bool currentIs(TokenType type);
 static TokenType nextType();
 static bool nextIs(TokenType type);
 static bool nextMatches(TokenType type);
-static void consume(TokenType type, const char* msg);
+static bool identifiersEqual(const Token* a, const Token* b);
 
-static uint8_t parseVariable(const char* expect);
-static void defineVariable(uint8_t global);
+static void pushScope();
+static void popScope();
+static void scope(StmtFn rule);
 
 static void declaration();
 static void variableDeclaration();
@@ -107,13 +106,15 @@ static void grouping(bool);
 
 static ParseRule* getRule(TokenType type);
 
-static uint8_t makeConstant(Value value);
-static uint8_t identifierConstant(const Token* token);
-static bool identifiersEqual(const Token* a, const Token* b);
+static uint8_t parseVariableIdent(const char* expect);
+static void defineVariable(uint8_t identConstOffset);
+static void declareLocal();
 static int resolveLocal(const Compiler* cmp, const Token* identifier);
-static void declareVariable();
 static void addLocal(Token identifier);
+static void markDefined();
 
+static uint8_t makeConstant(Value value);
+static uint8_t makeIdentConstant(const Token* token);
 static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);

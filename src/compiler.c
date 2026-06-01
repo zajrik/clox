@@ -73,31 +73,6 @@ static void endCompilation() {
   #endif
 }
 
-/// Begin a new scope.
-void pushScope() {
-  compiler->scopeDepth++;
-}
-
-/// End the current scope.
-void popScope() {
-  compiler->scopeDepth--;
-
-  while (compiler->localCount > 0
-    && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
-    emitByte(OP_POP);
-    compiler->localCount--;
-  }
-}
-
-/// Execute the given statement rule within a new scope.
-///
-/// The scope will be popped when the rule completes.
-void scope(const StmtFn rule) {
-  pushScope();
-  rule();
-  popScope();
-}
-
 /// Advance the parser, consuming the current token and scanning the next token.
 static void advance() {
   parser.current = parser.next;
@@ -108,6 +83,14 @@ static void advance() {
 
     errorAtNext(parser.next.start);
   }
+}
+
+/// Consume a token of the given [type] from scanned tokens.
+///
+/// Emits an error [msg] if the token type is not consumed.
+static void consume(const TokenType type, const char* msg) {
+  if (nextIs(type)) return advance();
+  errorAtNext(msg);
 }
 
 /// Returns the [TokenType] of the current token being parsed/compiled.
@@ -137,30 +120,35 @@ static bool nextMatches(const TokenType type) {
   return advance(), true;
 }
 
-/// Consume a token of the given [type] from scanned tokens.
-///
-/// Emits an error [msg] if the token type is not consumed.
-static void consume(const TokenType type, const char* msg) {
-  if (nextIs(type)) return advance();
-  errorAtNext(msg);
+/// Returns whether the given identifier tokens are equal.
+static bool identifiersEqual(const Token* a, const Token* b) {
+  if (a->length != b->length) return false;
+  return memcmp(a->start, b->start, a->length) == 0;
 }
 
-/// Parses a variable identifier, returning the offset to the variable address.
-///
-/// If the variable identifier cannot be parsed, errors with message [expect].
-static uint8_t parseVariable(const char* expect) {
-  consume(TOKEN_IDENTIFIER, expect);
-  declareVariable();
-  if (compiler->scopeDepth > 0) return 0;
-  return identifierConstant(&parser.current);
+/// Begin a new scope.
+void pushScope() {
+  compiler->scopeDepth++;
 }
 
-/// Emit bytecode to define a global variable.
+/// End the current scope.
+void popScope() {
+  compiler->scopeDepth--;
+
+  while (compiler->localCount > 0
+    && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
+    emitByte(OP_POP);
+    compiler->localCount--;
+  }
+}
+
+/// Execute the given statement rule within a new scope.
 ///
-/// The given [global] constant value index will be emitted as the operand.
-static void defineVariable(const uint8_t global) {
-  if (compiler->scopeDepth > 0) return;
-  emitBytes(OP_DEFINE_GLOBAL, global);
+/// The scope will be popped when the rule completes.
+void scope(const StmtFn rule) {
+  pushScope();
+  rule();
+  popScope();
 }
 
 // Statement parse/compilation functions ======================================
@@ -179,12 +167,12 @@ static void declaration() {
 
 /// Parses/compiles a variable declaration statement from scanned tokens.
 static void variableDeclaration() {
-  const uint8_t global = parseVariable("Expected variable name.");
+  const uint8_t identOffset = parseVariableIdent("Expected variable name.");
 
   nextMatches(TOKEN_EQUAL) ? expression() : emitByte(OP_NIL);
   consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
 
-  defineVariable(global);
+  defineVariable(identOffset);
 }
 
 /// Parses/compiles a statement from scanned tokens.
@@ -195,9 +183,6 @@ static void statement() {
     printStatement();
   } else if (nextMatches(TOKEN_LEFT_BRACE)) {
     scope(block);
-    // pushScope();
-    // block();
-    // popScope();
   } else {
     expressionStatement();
   }
@@ -319,7 +304,6 @@ static void binary(const bool _) {
     case TOKEN_MINUS: return emitByte(OP_SUBTRACT);
     case TOKEN_STAR: return emitByte(OP_MULTIPLY);
     case TOKEN_SLASH: return emitByte(OP_DIVIDE);
-
     default: break;
   }
 }
@@ -362,7 +346,7 @@ static void namedVariable(const Token token, const bool canAssign) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
   } else {
-    varOffset = identifierConstant(&token);
+    varOffset = makeIdentConstant(&token);
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
@@ -443,6 +427,106 @@ static ParseRule* getRule(const TokenType type) {
   return &rules[type];
 }
 
+// Variable parse/compilation/management functions ============================
+
+/// Parses a variable identifier, returning the offset to the constant string
+/// for the variable's identifier in the current chunk's constants array.
+///
+/// If the variable identifier cannot be parsed, errors with message [expect].
+static uint8_t parseVariableIdent(const char* expect) {
+  consume(TOKEN_IDENTIFIER, expect);
+
+  // Declare variable if we're in a local scope. We just return 0 if so since
+  // locals are resolved by identifier tokens while global variables are resolved
+  // by their runtime-constant identifier strings loaded into the VM before the
+  // lox bytecode is executed
+  if (compiler->scopeDepth > 0) {
+    declareLocal();
+    return 0;
+  }
+
+  // Create the constant identifier string for global variable
+  return makeIdentConstant(&parser.current);
+}
+
+/// Declare a variable in the current scope with the current token as its identifier.
+///
+/// Does nothing if we're currently in the global scope. Global variables are declared
+/// and defined separately from local variables.
+static void declareLocal() {
+  // This shouldn't be necessary if this function is only called in local scopes
+  if (compiler->scopeDepth == 0) return;
+
+  const Token* identifier = &parser.current;
+
+  // Check for existing variable with this identifier in this scope
+  for (int i = compiler->localCount - 1; i >= 0; i--) {
+    const Local* local = &compiler->locals[i];
+    if (local->depth != -1 && local->depth < compiler->scopeDepth) break;
+    if (identifiersEqual(identifier, &local->identifier)) {
+      error("A variable with this name already exists in this scope.");
+    }
+  }
+
+  addLocal(*identifier);
+}
+
+/// Define a variable.
+///
+/// If we are in a local scope, the current local will be marked as defined. The
+/// value lives on the stack and is modified on the stack when the variable is
+/// modified so we don't need to do anything more for it.
+///
+/// If we're in the global scope, emit bytecode to define the global variable,
+/// passing the offset of the global variable's constant identifier string as
+/// the operand.
+static void defineVariable(const uint8_t identConstOffset) {
+  if (compiler->scopeDepth > 0) return markDefined();
+  emitBytes(OP_DEFINE_GLOBAL, identConstOffset);
+}
+
+/// Walks down scoped locals array until locating the local variable with the given
+/// [identifier], returning the offset within the locals array of that local.
+///
+/// Returns `-1` if it does not exist.
+///
+/// Because of the way the stack behaves with statements popping their stack values
+/// when complete, the only values on the stack when a local is declared are the
+/// values of other locals in scope. This means the offset of the local in the
+/// locals array directly reflects its location in the stack.
+static int resolveLocal(const Compiler* cmp, const Token* identifier) {
+  for (int i = cmp->localCount - 1; i >= 0; i--) {
+    const Local* local = &cmp->locals[i];
+    if (identifiersEqual(identifier, &local->identifier)) {
+      if (local->depth == -1) {
+        error("Can't read local variable in its own initializer.");
+      }
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+/// Add a local in the current scope with the given [identifier].
+///
+/// The local will be considered uninitialized/undefined until [markDefined] is
+/// called.
+static void addLocal(const Token identifier) {
+  if (compiler->localCount == UINT8_COUNT) {
+    return error("Too many local variables in function.");
+  }
+
+  Local* local = &compiler->locals[compiler->localCount++];
+  local->identifier = identifier;
+  local->depth = -1;
+}
+
+/// Mark the most recently declared local as defined/ready for use.
+static void markDefined() {
+  compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+}
+
 // Chunk writing ==============================================================
 
 /// Add [value] to the constants in the chunk currently being compiled.
@@ -459,59 +543,10 @@ static uint8_t makeConstant(const Value value) {
   return offset;
 }
 
-/// Push an identifier to the constants array, returning the offset of the constant.
-static uint8_t identifierConstant(const Token* token) {
+/// Push an identifier's string to the current chunk's constants array, returning
+/// the offset of the added constant string.
+static uint8_t makeIdentConstant(const Token* token) {
   return makeConstant(OBJ_VAL(copyString(token->start, token->length)));
-}
-
-/// Returns whether the given identifier tokens are equal.
-static bool identifiersEqual(const Token* a, const Token* b) {
-  if (a->length != b->length) return false;
-  return memcmp(a->start, b->start, a->length) == 0;
-}
-
-/// Returns the local variable offset of the given variable [identifier] if it exists.
-///
-/// Returns `-1` if it does not exist.
-static int resolveLocal(const Compiler* cmp, const Token* identifier) {
-  for (int i = cmp->localCount - 1; i >= 0; i--) {
-    const Local* local = &cmp->locals[i];
-    if (identifiersEqual(identifier, &local->identifier)) return i;
-  }
-
-  return -1;
-}
-
-/// Declare a variable in the current scope with the current token as its identifier.
-static void declareVariable() {
-  if (compiler->scopeDepth == 0) return;
-
-  const Token* identifier = &parser.current;
-
-  for (int i = compiler->localCount - 1; i >= 0; i--) {
-    const Local* local = &compiler->locals[i];
-
-    if (local->depth != -1 && local->depth < compiler->scopeDepth) {
-      break;
-    }
-
-    if (identifiersEqual(identifier, &local->identifier)) {
-      error("A variable with this name already exists in this scope.");
-    }
-  }
-
-  addLocal(*identifier);
-}
-
-/// Add a local in the current scope with the given [identifier].
-static void addLocal(const Token identifier) {
-  if (compiler->localCount == UINT8_COUNT) {
-    return error("Too many local variables in function.");
-  }
-
-  Local* local = &compiler->locals[compiler->localCount++];
-  local->identifier = identifier;
-  local->depth = compiler->scopeDepth;
 }
 
 /// Write the given [byte] to the chunk currently being compiled.

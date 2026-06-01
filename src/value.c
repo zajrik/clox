@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 
 #include "headers/value.h"
 #include "headers/memory.h"
@@ -31,7 +30,6 @@ void writeValueArray(ValueArray* array, const Value value) {
   }
 
   array->values[array->count++] = value;
-  //array->count++;
 }
 
 /// Returns whether the given [value] is falsey.
@@ -56,17 +54,9 @@ bool valuesEqual(const Value a, const Value b) {
 /// Prints the given [value].
 void printValue(const Value value) {
   switch (value.type) {
-    case VAL_BOOL:
-      printf(AS_BOOL(value) ? "true" : "false");
-      break;
-    case VAL_NIL:
-      printf("nil");
-      break;
-    case VAL_NUMBER:
-      printf("%g", AS_NUMBER(value));
-      break;
-    case VAL_OBJ:
-      printObject(value);
-      break;
+    case VAL_BOOL: DO(printf(AS_BOOL(value) ? "true" : "false"));
+    case VAL_NIL: DO(printf("nil"));
+    case VAL_NUMBER: DO(printf("%g", AS_NUMBER(value)));
+    case VAL_OBJ: DO(printObject(value));
   }
 }

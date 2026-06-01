@@ -61,8 +61,7 @@ static void resetStack() {
 /// Inserts the value into memory at the address pointed to by [vm.stackTop] and
 /// increments the stack top pointer to point to the next open slot on the stack.
 void push(const Value value) {
-  *vm.stackTop = value;
-  vm.stackTop++;
+  *vm.stackTop++ = value;
 }
 
 /// Pop the top value from the vm stack.
@@ -71,14 +70,12 @@ void push(const Value value) {
 /// address (points to the top value in the stack which can safely be overwritten
 /// when a value is next pushed).
 Value pop() {
-  vm.stackTop--;
-  return *vm.stackTop;
+  return *--vm.stackTop;
 }
 
 /// Peek at a value in the stack, offset by [distance] from the top of the stack.
 static Value peek(const int distance) {
   return *(vm.stackTop - 1 - distance);
-  // return vm.stackTop[-1 - distance];
 }
 
 /// Pop two lox strings off of the stack, allocate a new string, copy the two
@@ -191,13 +188,8 @@ static InterpretResult run() {
       //
       // In contrast, the value we're pushing to the top of the stack here is the
       // result of variable get expression and will be consumed by the enclosing
-      // expression (or discarded
+      // expression (or discarded at the end of a statement)
       case OP_GET_LOCAL: DO(push(vm.stack[READ_BYTE()]));
-      // case OP_GET_LOCAL: {
-      //   const uint8_t slot = READ_BYTE();
-      //   push(vm.stack[slot]);
-      //   break;
-      // }
 
       // Local variable set expression op. Assigns the value at the top of the stack
       // to the stack slot where the local variable lives (obtained from the operand).
@@ -208,8 +200,9 @@ static InterpretResult run() {
       case OP_SET_LOCAL: DO(vm.stack[READ_BYTE()] = peek(0));
 
       // Global variable declaration statement expression op. Assigns the value at
-      // the top of the stack to the global variable obtained from the operand.
-      // The value will be popped off of the stack
+      // the top of the stack to the global variable with the identifier string
+      // obtained from the operand. The value will be popped off of the stack after
+      // the value has been assigned to the global
       case OP_DEFINE_GLOBAL: {
         ObjString* name = READ_STRING();
         tableSet(&vm.globals, name, peek(0));

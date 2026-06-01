@@ -37,7 +37,10 @@ uint32_t hashString(const char* string, const int length) {
 }
 
 /// Allocates a new lox string object and returns a pointer to it.
-ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
+///
+/// Allocated strings will be interned in the VM to ensure identical strings all
+/// point to the same object at runtime.
+static ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
@@ -55,7 +58,7 @@ ObjString* allocateString(char* chars, const int length, const uint32_t hash) {
 /// Returns a pointer to the allocated [ObjString].
 ///
 /// Constant c-strings must be copied to ensure programs can't free memory used
-/// by the original compile-time constant strings.
+/// by the lox source code string.
 ObjString* copyString(const char* chars, const int length) {
   const uint32_t hash = hashString(chars, length);
 
@@ -87,7 +90,7 @@ ObjString* takeString(char* chars, const int length) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;
   }
-  
+
   return allocateString(chars, length, hash);
 }
 

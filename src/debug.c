@@ -97,6 +97,7 @@ static int constantInstruction(const char* name, const Chunk* chunk, const int o
 /// raw byte value of its operand.
 static int byteInstruction(const char* name, const Chunk* chunk, const int offset) {
   const uint8_t byte = chunk->instructions[offset + 1];
-  printf("%-16s %4d '", name, byte);
+  printf("%-16s %4d\n", name, byte);
+
   return offset + 2;
 }
