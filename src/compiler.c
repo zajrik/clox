@@ -333,9 +333,9 @@ static void binary(const bool _) {
     case TOKEN_EQUAL_EQUAL: return emitByte(OP_EQUAL);
     case TOKEN_BANG_EQUAL: return emitBytes(OP_EQUAL, OP_NOT);
     case TOKEN_GREATER: return emitByte(OP_GREATER);
-    case TOKEN_GREATER_EQUAL: return emitBytes(OP_GREATER, OP_NOT);
+    case TOKEN_GREATER_EQUAL: return emitBytes(OP_LESS, OP_NOT);
     case TOKEN_LESS: return emitByte(OP_LESS);
-    case TOKEN_LESS_EQUAL: return emitBytes(OP_LESS, OP_NOT);
+    case TOKEN_LESS_EQUAL: return emitBytes(OP_GREATER, OP_NOT);
     case TOKEN_PLUS: return emitByte(OP_ADD);
     case TOKEN_MINUS: return emitByte(OP_SUBTRACT);
     case TOKEN_STAR: return emitByte(OP_MULTIPLY);
