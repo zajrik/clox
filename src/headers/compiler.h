@@ -91,6 +91,7 @@ static void statement();
 static void expressionStatement();
 static void printStatement();
 static void ifStatement();
+static void switchStatement();
 static void whileStatement();
 static void forStatement();
 static void block();
@@ -124,9 +125,22 @@ static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
 static void emitReturn();
+
 static int emitJump(OpCode opcode);
 static void patchJump(int offset);
 static void emitLoop(int offset);
+
+/// Linked list node for resolving multiple jumps to the same endpoint.
+typedef struct Jump Jump;
+
+struct Jump {
+  int offset;
+  Jump* next;
+};
+
+static Jump* newJumps();
+static void emitJumps(Jump** jumps);
+static void patchJumps(Jump** jumps);
 
 static void errorAtNext(const char* msg);
 static void error(const char* msg);

@@ -49,6 +49,9 @@ typedef enum OpCode {
   /// Pop one value off stack, negate it, push result to stack.
   OP_NEGATE,
 
+  /// Push a copy of the value at the top of the stack to the top of the stack.
+  OP_COPY,
+
   /// Pop the top value off of the stack, discarding it.
   OP_POP,
 

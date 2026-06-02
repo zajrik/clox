@@ -186,6 +186,8 @@ static void statement() {
     printStatement();
   } else if (nextMatches(TOKEN_IF)) {
     ifStatement();
+  } else if (nextMatches(TOKEN_SWITCH)) {
+    switchStatement();
   } else if (nextMatches(TOKEN_WHILE)) {
     whileStatement();
   } else if (nextMatches(TOKEN_FOR)) {
@@ -244,6 +246,62 @@ static void ifStatement() {
 
   // Patch elseJump to the end of the if-statement bytecode
   patchJump(elseJump);
+}
+
+/// Parse/compile a switch statement.
+///
+/// switchStmt  := "switch" "(" expression ")" "{" switchCase* defaultCase? "}" ;
+/// switchCase  := "case" ":" statement ;
+/// defaultCase := "default" ":" statement ;
+static void switchStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after switch.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+  consume(TOKEN_LEFT_BRACE, "Expected '{' after switch value.");
+
+  bool defaultFound = false;
+
+  Jump* exit = newJumps();
+
+  while (!nextMatches(TOKEN_RIGHT_BRACE)) {
+    if (!nextMatches(TOKEN_CASE) && !nextMatches(TOKEN_DEFAULT)) {
+      error("Expected 'case' or 'default'.");
+    }
+
+    // Compile non-default cases
+    if (!currentIs(TOKEN_DEFAULT)) {
+      // Copy condition value on stack to compare condition and case expression
+      // without popping the original value from the stack
+      emitByte(OP_COPY);
+
+      // Compile case expression and emit OP_EQUAL to compare to copied condition
+      expression();
+      emitByte(OP_EQUAL);
+    }
+    // Compile default case
+    else {
+      if (defaultFound) {
+        error("A switch statement may only have a single 'default' case.");
+      }
+      defaultFound = true;
+      emitByte(OP_TRUE);
+    }
+
+    consume(TOKEN_COLON, "Expected ':'.");
+
+    const int caseJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+    statement();
+
+    emitJumps(&exit);
+    patchJump(caseJump);
+    emitByte(OP_POP);
+  }
+
+  patchJumps(&exit);
+
+  // Pop condition value;
+  emitByte(OP_POP);
 }
 
 /// Parses/compiles a while statement from scanned tokens.
@@ -740,6 +798,41 @@ static void emitLoop(const int offset) {
   if (loopOffset > UINT16_MAX) error("Loop body is too large.");
 
   emitBytes(loopOffset >> 8 & 0xff, loopOffset & 0xff);
+}
+
+/// Allocate a new [Jump] node.
+///
+/// This should be passed to [emitJumps] and [patchJumps] to emit and patch a batch
+/// of jumps that will all point to the same endpoint when patched.
+static Jump* newJumps() {
+  Jump* jump = malloc(sizeof(Jump));
+  jump->offset = -1;
+  jump->next = NULL;
+  return jump;
+}
+
+/// Emit [OP_JUMP], prepending a [Jump] entry for that jump to the given linked
+/// jump list.
+///
+/// Don't forget to call [patchJumps]!
+static void emitJumps(Jump** jumps) {
+  Jump* jump = malloc(sizeof(Jump));
+  jump->offset = emitJump(OP_JUMP);
+  jump->next = *jumps;
+  *jumps = jump;
+}
+
+/// Patch all jumps in the given linked list of jumps.
+///
+/// The allocated jumps will be freed after patching, including the root jump.
+static void patchJumps(Jump** jumps) {
+  while ((*jumps)->next != NULL) {
+    Jump* current = *jumps;
+    patchJump(current->offset);
+    *jumps = current->next;
+    free(current);
+  }
+  free(*jumps);
 }
 
 // Error management ===========================================================

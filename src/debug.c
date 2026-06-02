@@ -51,6 +51,7 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_DIVIDE: return simpleInstruction("OP_DIVIDE", offset);
     case OP_NEGATE: return simpleInstruction("OP_NEGATE", offset);
 
+    case OP_COPY: return simpleInstruction("OP_COPY", offset);
     case OP_POP: return simpleInstruction("OP_POP", offset);
     case OP_POP_N: return byteInstruction("OP_POP_N", chunk, offset);
 

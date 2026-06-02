@@ -186,6 +186,7 @@ static InterpretResult run() {
         push(NUMBER_VAL(-AS_NUMBER(pop())));
         break;
 
+      case OP_COPY: DO(push(peek(0)));
       case OP_POP: DO(pop());
       case OP_POP_N: DO(popN(READ_BYTE()));
 
