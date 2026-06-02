@@ -1,4 +1,5 @@
-print true and false;
-print false and true;
-print true or false;
-print false or true;
+var i = 10;
+while (i >= 0) {
+    print i;
+    i = i - 1;
+}

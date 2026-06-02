@@ -91,6 +91,8 @@ static void statement();
 static void expressionStatement();
 static void printStatement();
 static void ifStatement();
+static void whileStatement();
+static void forStatement();
 static void block();
 
 static void expr(Precedence precedence);
@@ -124,6 +126,7 @@ static void emitConstant(Value value);
 static void emitReturn();
 static int emitJump(OpCode opcode);
 static void patchJump(int offset);
+static void emitLoop(int offset);
 
 static void errorAtNext(const char* msg);
 static void error(const char* msg);

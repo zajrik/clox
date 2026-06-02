@@ -186,6 +186,8 @@ static void statement() {
     printStatement();
   } else if (nextMatches(TOKEN_IF)) {
     ifStatement();
+  } else if (nextMatches(TOKEN_WHILE)) {
+    whileStatement();
   } else if (nextMatches(TOKEN_LEFT_BRACE)) {
     scope(block);
   } else {
@@ -204,7 +206,7 @@ static void expressionStatement() {
 
 /// Parses/compiles a print statement from scanned tokens.
 ///
-/// printStmt := "print" exprStmt ;
+/// printStmt := "print" exprStmt ";" ;
 static void printStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expected ';' after value.");
@@ -240,6 +242,25 @@ static void ifStatement() {
 
   // Patch elseJump to the end of the if-statement bytecode
   patchJump(elseJump);
+}
+
+/// Parses/compiles a while statement from scanned tokens.
+///
+/// whileStmt := "while" "(" expression ")" statement ;
+static void whileStatement() {
+  const int loopStart = currentChunk()->count;
+
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after 'while'.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+
+  const int exit = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  emitLoop(loopStart);
+
+  patchJump(exit);
+  emitByte(OP_POP);
 }
 
 /// Parses/compiles a block statement from scanned tokens.
@@ -515,7 +536,7 @@ static uint8_t parseVariableIdent(const char* expect) {
 /// and defined separately from local variables.
 static void declareLocal() {
   // This shouldn't be necessary if this function is only called in local scopes
-  if (compiler->scopeDepth == 0) return;
+  // if (compiler->scopeDepth == 0) return;
 
   const Token* identifier = &parser.current;
 
@@ -631,21 +652,37 @@ static void emitReturn() {
   emitByte(OP_RETURN);
 }
 
+/// Write a jump [opcode] followed by placeholder bytes for the jump offset operand.
+///
+/// Must be patched with [patchJump] to wire up the accompanying jump offset.
+///
+/// Returns the instruction offset of the operand to be patched.
 static int emitJump(const OpCode opcode) {
   emitByte(opcode);
   emitBytes(0xff, 0xff);
   return currentChunk()->count - 2;
 }
 
+/// Patches the jump instruction operand at [offset] to the current instruction
+/// offset.
 static void patchJump(const int offset) {
-  const int jumpOffset = currentChunk()->count - 2 - offset;
-  if (jumpOffset > UINT16_MAX) {
-    error("Jump offset is too large");
-  }
+  const int jumpOffset = currentChunk()->count - offset - 2;
+  if (jumpOffset > UINT16_MAX) error("Jump offset is too large");
 
   // Patch first and second bytes of the 2-byte jump instruction operand
   currentChunk()->instructions[offset] = jumpOffset >> 8 & 0xff;
   currentChunk()->instructions[offset + 1] = jumpOffset & 0xff;
+}
+
+/// Write [OP_LOOP] followed by loop offset operand bytes to loop back to the given
+/// instruction [offset].
+static void emitLoop(const int offset) {
+  emitByte(OP_LOOP);
+
+  const int loopOffset = currentChunk()->count - offset + 2;
+  if (loopOffset > UINT16_MAX) error("Loop body is too large.");
+
+  emitBytes(loopOffset >> 8 & 0xff, loopOffset & 0xff);
 }
 
 // Error management ===========================================================
