@@ -188,6 +188,8 @@ static void statement() {
     ifStatement();
   } else if (nextMatches(TOKEN_WHILE)) {
     whileStatement();
+  } else if (nextMatches(TOKEN_FOR)) {
+    scope(forStatement);
   } else if (nextMatches(TOKEN_LEFT_BRACE)) {
     scope(block);
   } else {
@@ -261,6 +263,61 @@ static void whileStatement() {
 
   patchJump(exit);
   emitByte(OP_POP);
+}
+
+/// Parses/compiles a for statement from scanned tokens.
+///
+/// forStmt := "for" "(" ( varDecl | expression? ";" )
+///            expression? ";" expression? ")" statement ;
+static void forStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after 'for'.");
+
+  // Compile initializer clause
+  if (nextMatches(TOKEN_VAR)) variableDeclaration();
+  else if (!nextMatches(TOKEN_SEMICOLON)) expressionStatement();
+
+  // Set loop start before condition expression. If we have an increment expression,
+  // this will be changed so that the final loop instruction jumps to the increment
+  // expression which will then jump back here after executing
+  int loopStart = currentChunk()->count;
+
+  int exit = -1;
+
+  // Compile loop condition if present and add exit jump op
+  if (!nextMatches(TOKEN_SEMICOLON)) {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expected ';' after loop condition.");
+
+    exit = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+  }
+
+  // Compile increment expression if present
+  if (!nextMatches(TOKEN_RIGHT_PAREN)) {
+    const int incrementJump = emitJump(OP_JUMP);
+    const int incrementStart = currentChunk()->count;
+
+    expression();
+    emitByte(OP_POP);
+    consume(TOKEN_RIGHT_PAREN, "Expected ')' after for clauses.");
+
+    // Loop back to start after executing increment expression, update loopStart
+    // to point to the increment so the body loops back here after executing
+    emitLoop(loopStart);
+    loopStart = incrementStart;
+
+    patchJump(incrementJump);
+  }
+
+  // Compile loop body, emit loop for loop start, or increment start if provided
+  statement();
+  emitLoop(loopStart);
+
+  // If a loop condition was provided, patch exit jump and pop condition
+  if (exit != -1) {
+    patchJump(exit);
+    emitByte(OP_POP);
+  }
 }
 
 /// Parses/compiles a block statement from scanned tokens.
