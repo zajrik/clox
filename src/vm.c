@@ -265,6 +265,12 @@ static InterpretResult run() {
         break;
       }
 
+      case OP_JUMP_IF_NOT_NIL: {
+        const uint16_t offset = READ_SHORT();
+        if (!IS_NIL(peek(0))) vm.ip += offset;
+        break;
+      }
+
       case OP_JUMP: {
         const uint16_t offset = READ_SHORT();
         vm.ip += offset;

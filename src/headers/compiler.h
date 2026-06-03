@@ -104,6 +104,8 @@ static void unary(bool);
 static void binary(bool);
 static void and(bool);
 static void or(bool);
+static void nilish(bool);
+static void switchExpr(bool);
 static void literal(bool);
 static void number(bool);
 static void string(bool);

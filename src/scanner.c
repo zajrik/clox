@@ -240,6 +240,7 @@ Token scanToken() {
     case '*': return makeToken(TOKEN_STAR);
     case '/': return makeToken(TOKEN_SLASH);
 
+    case '?': return makeToken(match('?') ? TOKEN_NILISH : TOKEN_QUESTION);
     case '!': return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '<': return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>': return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);

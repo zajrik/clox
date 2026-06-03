@@ -9,3 +9,8 @@
     _ => "ope"
   };
 }
+
+var a;
+
+print a;
+print a ?? "not nil";

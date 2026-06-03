@@ -511,6 +511,17 @@ static void or(bool _) {
   patchJump(end);
 }
 
+/// Compile a nilish (??) operator expression.
+///
+/// The left-hand operand of the `??` expression has already been compiled to
+/// the chunk at this point and will be called.
+static void nilish(bool _) {
+  const int end = emitJump(OP_JUMP_IF_NOT_NIL);
+  emitByte(OP_POP);
+  expr(PREC_OR);
+  patchJump(end);
+}
+
 /// Compile a switch expression from source tokens.
 ///
 /// switchExpr := "switch" "(" expression ")" "{" caseExpr* "}" ;
@@ -647,6 +658,7 @@ static ParseRule rules[] = {
   [TOKEN_LESS_EQUAL]    = {NULL,       binary,   PREC_COMPARISON },
 
   [TOKEN_ARROW]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_NILISH]        = {NULL,       nilish,   PREC_OR         },
 
   // Literal token rules
   [TOKEN_IDENTIFIER]    = {variable,   NULL,     PREC_NONE       },
