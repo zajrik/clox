@@ -126,6 +126,13 @@ static bool identifiersEqual(const Token* a, const Token* b) {
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
+/// Returns whether the given [token] is a discard token (`_`).
+static bool isDiscardToken(const Token token) {
+  return token.length == 1 && *token.start == '_';
+}
+
+// Scope management functions =================================================
+
 /// Begin a new scope.
 void pushScope() {
   compiler->scopeDepth++;
@@ -263,7 +270,7 @@ static void switchStatement() {
 
   Jump* exit = newJumps();
 
-  while (!nextMatches(TOKEN_RIGHT_BRACE)) {
+  while (!nextMatches(TOKEN_RIGHT_BRACE) && !nextMatches(TOKEN_EOF)) {
     if (!nextMatches(TOKEN_CASE) && !nextMatches(TOKEN_DEFAULT)) {
       error("Expected 'case' or 'default'.");
     }
@@ -504,6 +511,56 @@ static void or(bool _) {
   patchJump(end);
 }
 
+/// Compile a switch expression from source tokens.
+///
+/// switchExpr := "switch" "(" expression ")" "{" caseExpr* "}" ;
+/// caseExpr   := ( expression | "_" ) "=>" expression ;
+static void switchExpr(bool _) {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after switch.");
+  expression();
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
+  consume(TOKEN_LEFT_BRACE, "Expected '{' after switch value.");
+
+  bool defaultFound = false;
+
+  Jump* exit = newJumps();
+
+  while (!nextMatches(TOKEN_RIGHT_BRACE) && !nextMatches(TOKEN_EOF)) {
+    // Compile expression cases
+    if (!nextIs(TOKEN_IDENTIFIER) || !isDiscardToken(parser.next)) {
+      emitByte(OP_COPY);
+      expression();
+      emitByte(OP_EQUAL);
+    }
+    // Compile wildcard cases
+    else {
+      defaultFound = true;
+      advance();
+      emitByte(OP_TRUE);
+    }
+
+    consume(TOKEN_ARROW, "Expected '=>'.");
+
+    const int caseJump = emitJump(OP_JUMP_IF_FALSE);
+
+    // Pop case expression AND switch input expression from stack
+    emitBytes(OP_POP_N, 2);
+
+    expression();
+
+    emitJumps(&exit);
+    patchJump(caseJump);
+    emitByte(OP_POP);
+  }
+
+  // If we didn't find a wildcard/default case then we need to make sure the expression
+  // returns `nil` in the event that no case matches the input. Any matching case will
+  // jump over this, leaving its result on the stack
+  if (!defaultFound) emitBytes(OP_POP, OP_NIL);
+
+  patchJumps(&exit);
+}
+
 /// Parses a keyword-literal expression, emitting the relevant opcode.
 static void literal(const bool _) {
   switch (currentType()) {
@@ -589,6 +646,8 @@ static ParseRule rules[] = {
   [TOKEN_LESS]          = {NULL,       binary,   PREC_COMPARISON },
   [TOKEN_LESS_EQUAL]    = {NULL,       binary,   PREC_COMPARISON },
 
+  [TOKEN_ARROW]         = {NULL,       NULL,     PREC_NONE       },
+
   // Literal token rules
   [TOKEN_IDENTIFIER]    = {variable,   NULL,     PREC_NONE       },
   [TOKEN_STRING]        = {string,     NULL,     PREC_NONE       },
@@ -597,6 +656,8 @@ static ParseRule rules[] = {
   // Keyword token rules
   [TOKEN_AND]           = {NULL,       and,      PREC_AND        },
   [TOKEN_CLASS]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_CASE]          = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_DEFAULT]       = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_ELSE]          = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_FALSE]         = {literal,    NULL,     PREC_NONE       },
   [TOKEN_FOR]           = {NULL,       NULL,     PREC_NONE       },
@@ -607,6 +668,7 @@ static ParseRule rules[] = {
   [TOKEN_PRINT]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_RETURN]        = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SUPER]         = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_SWITCH]        = {switchExpr, NULL,     PREC_NONE       },
   [TOKEN_THIS]          = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_TRUE]          = {literal,    NULL,     PREC_NONE       },
   [TOKEN_VAR]           = {NULL,       NULL,     PREC_NONE       },
@@ -650,9 +712,6 @@ static uint8_t parseVariableIdent(const char* expect) {
 /// Does nothing if we're currently in the global scope. Global variables are declared
 /// and defined separately from local variables.
 static void declareLocal() {
-  // This shouldn't be necessary if this function is only called in local scopes
-  // if (compiler->scopeDepth == 0) return;
-
   const Token* identifier = &parser.current;
 
   // Check for existing variable with this identifier in this scope
@@ -879,6 +938,7 @@ static void synchronize() {
       case TOKEN_VAR:
       case TOKEN_FOR:
       case TOKEN_IF:
+      case TOKEN_SWITCH:
       case TOKEN_WHILE:
       case TOKEN_PRINT:
       case TOKEN_RETURN:

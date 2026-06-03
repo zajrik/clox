@@ -80,6 +80,7 @@ static TokenType nextType();
 static bool nextIs(TokenType type);
 static bool nextMatches(TokenType type);
 static bool identifiersEqual(const Token* a, const Token* b);
+static bool isDiscardToken(Token token);
 
 static void pushScope();
 static void popScope();

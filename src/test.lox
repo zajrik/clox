@@ -1,12 +1,11 @@
-var a = 11;
+{
+  var a = 5;
 
-switch (a) {
-  case 1: print "one";
-  case 2: print "two";
-  case 3: print "three";
-  case 4: print "four";
-  default: {
-    print a;
-    print "foo";
-  }
+  print switch (a) {
+    1 => "one"
+    2 => "two"
+    3 => "three"
+    4 => "four"
+    _ => "ope"
+  };
 }
