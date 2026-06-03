@@ -13,7 +13,7 @@
   (type*)allocateObject(sizeof(type), objectType)
 
 /// Allocates a new lox object of [size] and [type] and returns a pointer to it.
-Obj* allocateObject(const size_t size, const ObjType type) {
+static Obj* allocateObject(const size_t size, const ObjType type) {
   Obj* object = reallocate(NULL, 0, size);
   // ReSharper disable once CppDFANullDereference
   // SAFETY: reallocate will exit if it fails to allocate the memory
@@ -94,9 +94,25 @@ ObjString* takeString(char* chars, const int length) {
   return allocateString(chars, length, hash);
 }
 
+/// Allocates a new [ObjFunction] and returns a pointer to it.
+ObjFunction* newFunction() {
+  ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+  function->arity = 0;
+  function->identifier = NULL;
+  initChunk(&function->chunk);
+  return function;
+}
+
 /// Print the given lox object value.
 void printObject(const Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
+    case OBJ_FUNCTION: DO(printFunction(AS_FUNCTION(value)));
   }
+}
+
+/// Print the given lox function value.
+void printFunction(const ObjFunction* function) {
+  if (function->identifier == NULL) printf("<anonymous fun>");
+  else printf("<fun %s>", function->identifier->chars);
 }
