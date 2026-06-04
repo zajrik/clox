@@ -25,7 +25,6 @@ void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
 void freeObject(Obj* object) {
   switch (object->type) {
     case OBJ_STRING: {
-      printf("freeing %p\n", (void*)object);
       const ObjString* strObj = (ObjString*)object;
       FREE_ARRAY(char, strObj->chars, strObj->length + 1);
       FREE(ObjString, object);
@@ -35,9 +34,6 @@ void freeObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       freeChunk(&function->chunk);
-      if (function->identifier != NULL) {
-        FREE(ObjString, function->identifier);
-      }
       FREE(ObjFunction, function);
       break;
     }

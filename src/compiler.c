@@ -14,21 +14,34 @@
 /// Global parser instance.
 Parser parser;
 
-/// Pointer to the current compiler (?)
+/// Pointer to the current compiler
 Compiler* compiler = NULL;
 
 /// Initialize the given [compiler] instance.
-static void initCompiler(Compiler* cmp, const FunctionType type) {
-  // cmp->function = NULL;
-  cmp->function = newFunction(type);
-  cmp->type = type;
-  cmp->localCount = 0;
-  cmp->scopeDepth = 0;
-  compiler = cmp;
+static void initCompiler(Compiler* c, const FunctionType type) {
+  // Link given compiler to the current compiler
+  c->enclosing = compiler;
 
-  // Reserve local slot 0
+  c->function = NULL;
+  c->type = type;
+  c->localCount = 0;
+  c->scopeDepth = 0;
+  c->function = newFunction(type);
+
+  // Set the given compiler as current compiler
+  compiler = c;
+
+  if (type != TYPE_SCRIPT) {
+    compiler->function->identifier = copyString(
+      parser.current.start,
+      parser.current.length
+    );
+  }
+
+  // Reserve local slot 0 for root function
   Local* local = &compiler->locals[compiler->localCount++];
   local->depth = 0;
+  local->identifier.type = TOKEN_IDENTIFIER;
   local->identifier.start = "";
   local->identifier.length = 0;
 }
@@ -45,11 +58,8 @@ static Chunk* currentChunk() {
 ObjFunction* compile(const char* source) {
   initScanner(source);
 
-  Compiler cmp;
-  // ReSharper disable once CppDFALocalValueEscapesFunction
-  initCompiler(&cmp, TYPE_SCRIPT);
-
-  // compilingChunk = chunk;
+  Compiler c;
+  initCompiler(&c, TYPE_SCRIPT);
 
   parser.hadError = false;
   parser.panicMode = false;
@@ -82,6 +92,8 @@ static ObjFunction* endCompilation() {
   }
   #endif
 
+  // Return to the enclosing compiler
+  compiler = compiler->enclosing;
   return fun;
 }
 
@@ -179,7 +191,9 @@ void scope(const StmtFn rule) {
 ///
 /// declaration := varDecl | statement ;
 static void declaration() {
-  if (nextMatches(TOKEN_VAR)) {
+  if (nextMatches(TOKEN_FUN)) {
+    functionDeclaration();
+  } else if (nextMatches(TOKEN_VAR)) {
     variableDeclaration();
   } else {
     statement();
@@ -187,7 +201,18 @@ static void declaration() {
   if (parser.panicMode) synchronize();
 }
 
-/// Parses/compiles a variable declaration statement from scanned tokens.
+/// Compiles a function declaration from scanned tokens.
+static void functionDeclaration() {
+  const uint8_t identOffset = parseVariableIdent("Expected function name.");
+
+  // Mark function as defined so it can refer to itself.
+  markDefined();
+
+  function(TYPE_FUNCTION);
+  defineVariable(identOffset);
+}
+
+/// Compiles a variable declaration statement from scanned tokens.
 static void variableDeclaration() {
   const uint8_t identOffset = parseVariableIdent("Expected variable name.");
 
@@ -197,7 +222,7 @@ static void variableDeclaration() {
   defineVariable(identOffset);
 }
 
-/// Parses/compiles a statement from scanned tokens.
+/// Compiles a statement from scanned tokens.
 ///
 /// statement := exprStmt | printStmt | ifStmt | block ;
 static void statement() {
@@ -218,7 +243,7 @@ static void statement() {
   }
 }
 
-/// Parses/compiles an expression statement from scanned tokens.
+/// Compiles an expression statement from scanned tokens.
 ///
 /// exprStmt := expression ";" ;
 static void expressionStatement() {
@@ -227,7 +252,7 @@ static void expressionStatement() {
   emitByte(OP_POP);
 }
 
-/// Parses/compiles a print statement from scanned tokens.
+/// Compiles a print statement from scanned tokens.
 ///
 /// printStmt := "print" exprStmt ";" ;
 static void printStatement() {
@@ -236,7 +261,7 @@ static void printStatement() {
   emitByte(OP_PRINT);
 }
 
-/// Parses/compiles an if statement from scanned tokens.
+/// Compiles an if statement from scanned tokens.
 ///
 /// ifStmt := "if" "(" expression ")" statement ( "else" statement )? ;
 static void ifStatement() {
@@ -323,7 +348,7 @@ static void switchStatement() {
   emitByte(OP_POP);
 }
 
-/// Parses/compiles a while statement from scanned tokens.
+/// Compiles a while statement from scanned tokens.
 ///
 /// whileStmt := "while" "(" expression ")" statement ;
 static void whileStatement() {
@@ -342,7 +367,7 @@ static void whileStatement() {
   emitByte(OP_POP);
 }
 
-/// Parses/compiles a for statement from scanned tokens.
+/// Compiles a for statement from scanned tokens.
 ///
 /// forStmt := "for" "(" ( varDecl | expression? ";" )
 ///            expression? ";" expression? ")" statement ;
@@ -397,7 +422,7 @@ static void forStatement() {
   }
 }
 
-/// Parses/compiles a block statement from scanned tokens.
+/// Compiles a block statement from scanned tokens.
 ///
 /// block := "{" declaration* "}" ;
 static void block() {
@@ -405,6 +430,40 @@ static void block() {
     declaration();
   }
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
+}
+
+/// Compiles a function of the given [type] from scanned tokens.
+static void function(const FunctionType type) {
+  Compiler c;
+  initCompiler(&c, type);
+
+  // Push scope for function. This does not need to be closed since the function
+  // being compiled has its own compiler instance which will discard the scope
+  // when compilation is complete
+  pushScope();
+
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
+
+  if (!nextIs(TOKEN_RIGHT_PAREN)) {
+    do {
+      // Allow dangling comma
+      if (nextIs(TOKEN_RIGHT_PAREN)) break;
+
+      compiler->function->arity++;
+      if (compiler->function->arity > 255) {
+        errorAtNext("Can't have more than 255 parameters.");
+      }
+      const uint8_t param = parseVariableIdent("Expected parameter identifier.");
+      defineVariable(param);
+    } while (nextMatches(TOKEN_COMMA));
+  }
+
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after function parameters.");
+  consume(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
+  block();
+
+  ObjFunction* function = endCompilation();
+  emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
 }
 
 // Expression parse/compilation functions =====================================
@@ -607,13 +666,13 @@ static void string(const bool _) {
   emitConstant(OBJ_VAL(copyString(stringStart, stringLength)));
 }
 
-/// Parses/compiles a variable/identifier expression.
+/// Compiles a variable/identifier expression.
 static void variable(const bool canAssign) {
   namedVariable(parser.current, canAssign);
 }
 
-/// Parses/compiles a variable/identifier get/set expression, emitting bytecode
-/// to fetch/set the value for that variable/identifier.
+/// Compiles a variable/identifier get/set expression, emitting bytecode to fetch/set
+/// the value for that variable/identifier.
 static void namedVariable(const Token token, const bool canAssign) {
   uint8_t getOp, setOp;
 
@@ -736,6 +795,8 @@ static uint8_t parseVariableIdent(const char* expect) {
 /// Does nothing if we're currently in the global scope. Global variables are declared
 /// and defined separately from local variables.
 static void declareLocal() {
+  if (compiler->scopeDepth == 0) return;
+
   const Token* identifier = &parser.current;
 
   // Check for existing variable with this identifier in this scope
@@ -802,7 +863,12 @@ static void addLocal(const Token identifier) {
 }
 
 /// Mark the most recently declared local as defined/ready for use.
+///
+/// Does nothing if we're currently in the global scope. Global variables are declared
+/// and defined separately from local variables.
 static void markDefined() {
+  // Only mark non-global variables as defined.
+  if (compiler->scopeDepth == 0) return;
   compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
 }
 

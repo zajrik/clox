@@ -26,8 +26,14 @@ typedef struct Local {
   int depth;
 } Local;
 
+typedef struct Compiler Compiler;
+
 /// Holds data for compiling lox source code into bytecode.
-typedef struct Compiler {
+struct Compiler {
+  /// Enclosing compiler, forming a linked list of nested compilers, each compiling
+  /// a single encapsulating function object.
+  Compiler* enclosing;
+
   /// The currently compiling function object.
   ///
   /// This can be a lox program itself, or any functions defined therein.
@@ -47,7 +53,7 @@ typedef struct Compiler {
 
   /// Current scope depth at a given point during compilation.
   int scopeDepth;
-} Compiler;
+};
 
 /// Indicates the level of precedence with which to parse and compile an expression.
 ///
@@ -106,6 +112,7 @@ static void popScope();
 static void scope(StmtFn rule);
 
 static void declaration();
+static void functionDeclaration();
 static void variableDeclaration();
 static void statement();
 static void expressionStatement();
@@ -115,6 +122,7 @@ static void switchStatement();
 static void whileStatement();
 static void forStatement();
 static void block();
+static void function(FunctionType type);
 
 static void expr(Precedence precedence);
 

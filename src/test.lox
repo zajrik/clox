@@ -1,16 +1,10 @@
 {
-  var a = 5;
+  var a;
+  print a;
 
-  print switch (a) {
-    1 => "one"
-    2 => "two"
-    3 => "three"
-    4 => "four"
-    _ => "ope"
-  };
+  fun foo(x, y, z) {
+    print x + y + z;
+  }
+
+  print foo;
 }
-
-var a;
-
-print a;
-print a ?? "not nil";
