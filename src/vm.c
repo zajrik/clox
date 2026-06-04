@@ -8,32 +8,6 @@
 #include "headers/memory.h"
 #include "headers/object.h"
 
-/// Read the byte pointed to by the current vm instruction pointer and increment
-/// the instruction pointer to point to the next byte.
-#define READ_BYTE() *vm.ip++
-
-/// Read the next two bytes at the current instruction pointer as a single 16-bit
-/// value.
-#define READ_SHORT() (vm.ip += 2, (uint16_t)(vm.ip[-2] << 8 | vm.ip[-1]))
-
-/// Read the constant value at the offset obtained by reading the next byte.
-#define READ_CONSTANT() vm.chunk->constants.values[READ_BYTE()]
-
-/// Read the string constant value at the offset obtained by reading the next byte.
-#define READ_STRING() AS_STRING(READ_CONSTANT())
-
-/// Perform a binary operation using the top two values off the top of the stack,
-/// pushing the result of the operation back onto the stack.
-#define BINARY_OP(valueType, op) do { \
-  if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
-    runtimeError("Operands must be numbers."); \
-    return INTERPRET_RUNTIME_ERROR; \
-  } \
-  double b = AS_NUMBER(pop()); \
-  double a = AS_NUMBER(pop()); \
-  push(valueType(a op b)); \
-} while (false)
-
 /// Global lox virtual machine instance.
 Vm vm;
 
@@ -58,6 +32,7 @@ void freeVm() {
 /// allowing it to be overwritten when the next value is pushed to the stack.
 static void resetStack() {
   vm.stackTop = vm.stack;
+  vm.frameCount = 0;
 }
 
 /// Push [value] to the top of the vm stack.
@@ -105,30 +80,54 @@ static void concatenate() {
 
 /// Interpret the given lox source code text.
 ///
-/// Code will be compiled before being run on the virtual machine.
+/// Code will be compiled and then run on the virtual machine.
 InterpretResult interpret(const char* source) {
-  Chunk chunk;
-  initChunk(&chunk);
+  // Compile script to root function object
+  ObjFunction* function = compile(source);
+  if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
-  if (!compile(source, &chunk)) {
-    freeChunk(&chunk);
-    return INTERPRET_COMPILE_ERROR;
-  }
+  // Push root function to slot 0 on the stack
+  push(OBJ_VAL(function));
 
-  // ReSharper disable once CppDFALocalValueEscapesFunction
-  // SAFETY: I trust Bob with my pointers (also I know for sure it's safely freed
-  // and unused after being freed).
-  vm.chunk = &chunk;
-  vm.ip = vm.chunk->instructions;
+  // Initialize the call frame for the root function
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->function = function;
+  frame->ip = function->chunk.instructions;
+  frame->slots = vm.stack;
 
-  const InterpretResult result = run();
-
-  freeChunk(&chunk);
-  return result;
+  return run();
 }
 
 /// Run the instructions from the currently loaded [Chunk].
 static InterpretResult run() {
+  CallFrame* frame = &vm.frames[vm.frameCount - 1];
+
+  /// Read the byte pointed to by the current vm instruction pointer and increment
+  /// the instruction pointer to point to the next byte.
+  #define READ_BYTE() (*frame->ip++)
+
+  /// Read the next two bytes at the current instruction pointer as a single 16-bit
+  /// value.
+  #define READ_SHORT() (frame->ip += 2, (uint16_t)(frame->ip[-2] << 8 | frame->ip[-1]))
+
+  /// Read the constant value at the offset obtained by reading the next byte.
+  #define READ_CONSTANT() frame->function->chunk.constants.values[READ_BYTE()]
+
+  /// Read the string constant value at the offset obtained by reading the next byte.
+  #define READ_STRING() AS_STRING(READ_CONSTANT())
+
+  /// Perform a binary operation using the top two values off the top of the stack,
+  /// pushing the result of the operation back onto the stack.
+  #define BINARY_OP(valueType, op) do { \
+    if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
+      runtimeError("Operands must be numbers."); \
+      return INTERPRET_RUNTIME_ERROR; \
+    } \
+    double b = AS_NUMBER(pop()); \
+    double a = AS_NUMBER(pop()); \
+    push(valueType(a op b)); \
+  } while (false)
+
   loop {
     #ifdef DEBUG_TRACE_EXECUTION
     printf("            ");
@@ -141,7 +140,11 @@ static InterpretResult run() {
     }
 
     printf("\n");
-    disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->instructions));
+
+    disassembleInstruction(
+      &frame->function->chunk,
+      (int)(frame->ip - frame->function->chunk.instructions)
+    );
     #endif
 
     switch (READ_BYTE()) {
@@ -200,7 +203,7 @@ static InterpretResult run() {
       // In contrast, the value we're pushing to the top of the stack here is the
       // result of variable get expression and will be consumed by the enclosing
       // expression (or discarded at the end of a statement)
-      case OP_GET_LOCAL: DO(push(vm.stack[READ_BYTE()]));
+      case OP_GET_LOCAL: DO(push(frame->slots[READ_BYTE()]));
 
       // Local variable set expression op. Assigns the value at the top of the stack
       // to the stack slot where the local variable lives (obtained from the operand).
@@ -208,7 +211,7 @@ static InterpretResult run() {
       // The stack-top value stays because it is also the result of the assignment
       // expression and will be popped when consumed by further expressions (or at
       // the end of the statement if the assignment is an expression statement)
-      case OP_SET_LOCAL: DO(vm.stack[READ_BYTE()] = peek(0));
+      case OP_SET_LOCAL: DO(frame->slots[READ_BYTE()] = peek(0));
 
       // Global variable declaration statement expression op. Assigns the value at
       // the top of the stack to the global variable with the identifier string
@@ -255,31 +258,31 @@ static InterpretResult run() {
 
       case OP_JUMP_IF_FALSE: {
         const uint16_t offset = READ_SHORT();
-        if (isFalsey(peek(0))) vm.ip += offset;
+        if (isFalsey(peek(0))) frame->ip += offset;
         break;
       }
 
       case OP_JUMP_IF_TRUE: {
         const uint16_t offset = READ_SHORT();
-        if (!isFalsey(peek(0))) vm.ip += offset;
+        if (!isFalsey(peek(0))) frame->ip += offset;
         break;
       }
 
       case OP_JUMP_IF_NOT_NIL: {
         const uint16_t offset = READ_SHORT();
-        if (!IS_NIL(peek(0))) vm.ip += offset;
+        if (!IS_NIL(peek(0))) frame->ip += offset;
         break;
       }
 
       case OP_JUMP: {
         const uint16_t offset = READ_SHORT();
-        vm.ip += offset;
+        frame->ip += offset;
         break;
       }
 
       case OP_LOOP: {
         const uint16_t offset = READ_SHORT();
-        vm.ip -= offset;
+        frame->ip -= offset;
         break;
       }
 
@@ -291,6 +294,12 @@ static InterpretResult run() {
         return INTERPRET_RUNTIME_ERROR;
     }
   }
+
+  #undef READ_BYTE
+  #undef READ_SHORT
+  #undef READ_CONSTANT
+  #undef READ_STRING
+  #undef BINARY_OP
 }
 
 static void runtimeError(const char* format, ...) {
@@ -302,18 +311,13 @@ static void runtimeError(const char* format, ...) {
 
   // Find the instruction that failed.
   //
-  // vm.ip points to the next instruction to be read, vm.chunk->instructions
-  // is the address of the first instruction. Subtracting those provides the
-  // offset of the next instruction to be read
-  const size_t instruction = vm.ip - vm.chunk->instructions - 1;
-  const int line = vm.chunk->lines[instruction];
+  // ip points to the next instruction to be read, chunk.instructions is the address
+  // of the first instruction. Subtracting those provides the offset of the next
+  // instruction to be read
+  const CallFrame* frame = &vm.frames[vm.frameCount - 1];
+  const size_t instruction = frame->ip - frame->function->chunk.instructions - 1;
+  const int line = frame->function->chunk.lines[instruction];
 
   fprintf(stderr, "[line %d] in script\n", line);
   resetStack();
 }
-
-#undef READ_BYTE
-#undef READ_SHORT
-#undef READ_CONSTANT
-#undef READ_STRING
-#undef BINARY_OP

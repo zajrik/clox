@@ -2,20 +2,36 @@
 #define CLOX_VM_H
 
 #include "chunk.h"
-#include "value.h"
 #include "hash_table.h"
+#include "object.h"
+#include "value.h"
 
-#define STACK_MAX 256
+#define FRAME_MAX 64
+#define STACK_MAX (FRAME_MAX * UINT8_COUNT)
+
+/// Function call frame, used to determine where on the stack a function's values
+/// live and to track instruction execution within the function itself.
+typedef struct CallFrame {
+  /// The function being invoked.
+  ObjFunction* function;
+
+  /// Instruction pointer, points to the next instruction in the function to be
+  /// read and executed.
+  uint8_t* ip;
+
+  /// Values on the stack within this function call frame.
+  Value* slots;
+} CallFrame;
 
 /// Virtual machine for interpreting lox instructions.
 typedef struct Vm {
-  /// The chunk of instruction opcodes and operands being interpreted by the vm.
-  Chunk* chunk;
+  /// Function call frame stack.
+  CallFrame frames[FRAME_MAX];
 
-  /// Instruction pointer, points to the next instruction to be read.
-  uint8_t* ip;
+  /// Height of the call frame stack.
+  int frameCount;
 
-  /// The stack of values in memory.
+  /// Stack of values in memory.
   Value stack[STACK_MAX];
 
   /// Pointer to the top of the stack, where the next item will be inserted.

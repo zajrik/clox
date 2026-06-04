@@ -19,13 +19,16 @@ typedef enum ObjType {
   OBJ_STRING,
 } ObjType;
 
-typedef struct Obj Obj;
+typedef enum FunctionType {
+  TYPE_FUNCTION,
+  TYPE_SCRIPT,
+} FunctionType;
 
 /// Base struct for heap-allocated lox object values.
-struct Obj {
+typedef struct Obj {
   ObjType type;
   Obj* next;
-};
+} Obj;
 
 /// Represents a lox string value.
 typedef struct ObjString {
@@ -38,6 +41,7 @@ typedef struct ObjString {
 /// Represents a lox function value.
 typedef struct ObjFunction {
   Obj object;
+  FunctionType type;
   int arity;
   Chunk chunk;
   ObjString* identifier;
@@ -54,7 +58,7 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash);
 ObjString* copyString(const char* chars, int length);
 ObjString* takeString(char* chars, int length);
 
-ObjFunction* newFunction();
+ObjFunction* newFunction(FunctionType type);
 
 void printObject(Value value);
 void printFunction(const ObjFunction* function);

@@ -95,8 +95,9 @@ ObjString* takeString(char* chars, const int length) {
 }
 
 /// Allocates a new [ObjFunction] and returns a pointer to it.
-ObjFunction* newFunction() {
+ObjFunction* newFunction(const FunctionType type) {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+  function->type = type;
   function->arity = 0;
   function->identifier = NULL;
   initChunk(&function->chunk);
@@ -113,6 +114,9 @@ void printObject(const Value value) {
 
 /// Print the given lox function value.
 void printFunction(const ObjFunction* function) {
-  if (function->identifier == NULL) printf("<anonymous fun>");
-  else printf("<fun %s>", function->identifier->chars);
+  if (function->identifier == NULL) {
+    printf(function->type == TYPE_SCRIPT ? "<script>" : "<fun>");
+  } else {
+    printf("<fun %s>", function->identifier->chars);
+  }
 }

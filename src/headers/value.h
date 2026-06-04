@@ -2,7 +2,10 @@
 #define CLOX_VALUE_H
 
 #include "common.h"
-#include "object.h"
+
+typedef struct Obj Obj;
+typedef struct ObjString ObjString;
+typedef struct ObjFunction ObjFunction;
 
 /// Type tags of possible lox value types.
 typedef enum ValueType {

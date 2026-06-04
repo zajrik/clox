@@ -18,32 +18,38 @@ Parser parser;
 Compiler* compiler = NULL;
 
 /// Initialize the given [compiler] instance.
-static void initCompiler(Compiler* cmp) {
+static void initCompiler(Compiler* cmp, const FunctionType type) {
+  // cmp->function = NULL;
+  cmp->function = newFunction(type);
+  cmp->type = type;
   cmp->localCount = 0;
   cmp->scopeDepth = 0;
   compiler = cmp;
-}
 
-/// Stores a pointer to the currently compiling chunk.
-Chunk* compilingChunk;
+  // Reserve local slot 0
+  Local* local = &compiler->locals[compiler->localCount++];
+  local->depth = 0;
+  local->identifier.start = "";
+  local->identifier.length = 0;
+}
 
 /// Returns a pointer to the currently compiling chunk.
 static Chunk* currentChunk() {
-  return compilingChunk;
+  return &compiler->function->chunk;
 }
 
 /// Compile the given [source] text into bytecode instructions, storing them in
 /// the given [chunk].
 ///
 /// Returns whether compilation was successful.
-bool compile(const char* source, Chunk* chunk) {
+ObjFunction* compile(const char* source) {
   initScanner(source);
 
   Compiler cmp;
   // ReSharper disable once CppDFALocalValueEscapesFunction
-  initCompiler(&cmp);
+  initCompiler(&cmp, TYPE_SCRIPT);
 
-  compilingChunk = chunk;
+  // compilingChunk = chunk;
 
   parser.hadError = false;
   parser.panicMode = false;
@@ -55,22 +61,28 @@ bool compile(const char* source, Chunk* chunk) {
     declaration();
   }
 
-  endCompilation();
+  ObjFunction* fun = endCompilation();
 
-  return !parser.hadError;
+  return !parser.hadError ? fun : NULL;
 }
 
 /// End the compilation process.
-static void endCompilation() {
+static ObjFunction* endCompilation() {
   emitReturn();
+  ObjFunction* fun = compiler->function;
 
   #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
-    disassembleChunk(currentChunk(), "code");
+    disassembleChunk(
+      currentChunk(),
+      fun->identifier != NULL ? fun->identifier->chars : "<script>"
+    );
   } else {
     printf("errors occurred\n");
   }
   #endif
+
+  return fun;
 }
 
 /// Advance the parser, consuming the current token and scanning the next token.

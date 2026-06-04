@@ -1,8 +1,9 @@
 ﻿#ifndef CLOX_COMPILER_H
 #define CLOX_COMPILER_H
 
-#include "headers/chunk.h"
-#include "headers/scanner.h"
+#include "chunk.h"
+#include "scanner.h"
+#include "object.h"
 
 /// Holds data for parsing scanned tokens and compiling into lox bytecode.
 typedef struct Parser {
@@ -19,14 +20,32 @@ typedef struct Parser {
   bool panicMode;
 } Parser;
 
+/// Represents the identifier and scope depth of a local variable.
 typedef struct Local {
   Token identifier;
   int depth;
 } Local;
 
+/// Holds data for compiling lox source code into bytecode.
 typedef struct Compiler {
+  /// The currently compiling function object.
+  ///
+  /// This can be a lox program itself, or any functions defined therein.
+  ///
+  /// A compiled lox program will be wrapped in a function object to be invoked
+  /// at runtime.
+  ObjFunction* function;
+
+  /// The type of the currently compiling function type.
+  FunctionType type;
+
+  /// Local variables tracked during compilation.
   Local locals[UINT8_COUNT];
+
+  /// Current number of local variables in scope at a given point during compilation.
   int localCount;
+
+  /// Current scope depth at a given point during compilation.
   int scopeDepth;
 } Compiler;
 
@@ -68,9 +87,9 @@ typedef struct ParseRule {
   Precedence precedence;
 } ParseRule;
 
-bool compile(const char* source, Chunk* chunk);
+ObjFunction* compile(const char* source);
 
-static void endCompilation();
+static ObjFunction* endCompilation();
 
 static void advance();
 static void consume(TokenType type, const char* msg);
