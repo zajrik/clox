@@ -99,9 +99,35 @@ ObjFunction* newFunction(const FunctionType type) {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
   function->type = type;
   function->arity = 0;
+  function->upvalueCount = 0;
   function->identifier = NULL;
   initChunk(&function->chunk);
   return function;
+}
+
+/// Allocates a new [ObjClosure] and returns a pointer to it.
+ObjClosure* newClosure(ObjFunction* function) {
+  // Allocate an array for function upvalue objects
+  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
+  for (int i = 0; i < function->upvalueCount; i++) {
+    upvalues[i] = NULL;
+  }
+
+  ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+  closure->function = function;
+  closure->upvalues = upvalues;
+  closure->upvalueCount = function->upvalueCount;
+  return closure;
+}
+
+/// Allocates a new [ObjUpvalue] and returns a pointer to it.
+///
+/// Accepts a pointer to a variable so the closure can access/modify the value
+/// of that variable after it leaves the stack.
+ObjUpvalue* newUpvalue(Value* slot) {
+  ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+  upvalue->location = slot;
+  return upvalue;
 }
 
 /// Allocates a new [ObjNative] and returns a pointer to it.
@@ -117,7 +143,12 @@ void printObject(const Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
     case OBJ_FUNCTION: DO(printFunction(AS_FUNCTION(value)));
+    case OBJ_CLOSURE: DO(printFunction(AS_CLOSURE(value)->function));
     case OBJ_NATIVE: DO(printf("<native fun>"));
+
+    // Upvalues are not exposed to the runtime so this is just to keep the
+    // compiler happy.
+    case OBJ_UPVALUE: DO(printf("<upvalue>"));
   }
 }
 

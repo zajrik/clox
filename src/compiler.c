@@ -482,7 +482,13 @@ static void function(const FunctionType type) {
   block();
 
   ObjFunction* function = endCompilation();
-  emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+
+  // Emit closure and upvalue bytecode
+  emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+  for (int i = 0; i < function->upvalueCount; i++) {
+    emitByte(c.upvalues[i].isLocal ? 1 : 0);
+    emitByte(c.upvalues[i].offset);
+  }
 }
 
 // Expression parse/compilation functions =====================================
@@ -692,15 +698,18 @@ static void variable(const bool canAssign) {
 
 /// Compiles a variable/identifier get/set expression, emitting bytecode to fetch/set
 /// the value for that variable/identifier.
-static void variableGetSet(const Token token, const bool canAssign) {
+static void variableGetSet(const Token identifier, const bool canAssign) {
   uint8_t getOp, setOp;
 
-  int varOffset = resolveLocal(compiler, &token);
+  int varOffset = resolveLocal(compiler, &identifier);
   if (varOffset != -1) {
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
+  } else if ((varOffset = resolveUpvalue(compiler, &identifier)) != -1) {
+    getOp = OP_GET_UPVALUE;
+    setOp = OP_SET_UPVALUE;
   } else {
-    varOffset = makeIdentConstant(&token);
+    varOffset = makeIdentConstant(&identifier);
     getOp = OP_GET_GLOBAL;
     setOp = OP_SET_GLOBAL;
   }
@@ -859,9 +868,9 @@ static void defineVariable(const uint8_t identConstOffset) {
 /// when complete, the only values on the stack when a local is declared are the
 /// values of other locals in scope. This means the offset of the local in the
 /// locals array directly reflects its location in the stack.
-static int resolveLocal(const Compiler* cmp, const Token* identifier) {
-  for (int i = cmp->localCount - 1; i >= 0; i--) {
-    const Local* local = &cmp->locals[i];
+static int resolveLocal(const Compiler* c, const Token* identifier) {
+  for (int i = c->localCount - 1; i >= 0; i--) {
+    const Local* local = &c->locals[i];
     if (identifiersEqual(identifier, &local->identifier)) {
       if (local->depth == -1) {
         error("Can't read local variable in its own initializer.");
@@ -895,6 +904,48 @@ static void markDefined() {
   // Only mark non-global variables as defined.
   if (compiler->scopeDepth == 0) return;
   compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
+}
+
+/// Resolve an upvalue with the given [identifier].
+static int resolveUpvalue(Compiler* c, const Token* identifier) {
+  // If this is the root scope, the upvalue must be global
+  if (c->enclosing == NULL) return -1;
+
+  // Try to resolve an upvalue from locals in the enclosing scope
+  const int local = resolveLocal(c->enclosing, identifier);
+  if (local != -1) return addUpvalue(c, (uint8_t)local, true);
+
+  // Try to resolve an upvalue from upvalues in the enclosing scope
+  const int upvalue = resolveUpvalue(c->enclosing, identifier);
+  if (upvalue != -1) return addUpvalue(c, (uint8_t)upvalue, false);
+
+  return -1;
+}
+
+/// Add an upvalue to the compiled upvalues in the given compiler's scope.
+///
+/// Returns the offset for locating the upvalue at runtime.
+static int addUpvalue(Compiler* c, const uint8_t offset, const bool isLocal) {
+  const int upvalueCount = c->function->upvalueCount;
+
+  // Check for existing compiled upvalue matching the given offset/locality
+  for (int i = 0; i < upvalueCount; i++) {
+    const Upvalue* upvalue = &compiler->upvalues[i];
+    if (upvalue->offset == offset && upvalue->isLocal == isLocal) {
+      return i;
+    }
+  }
+
+  if (upvalueCount == UINT8_COUNT) {
+    error("Too many closure variables in function.");
+    return 0;
+  }
+
+  // Add new upvalue
+  Upvalue* upvalue = &c->upvalues[upvalueCount];
+  upvalue->isLocal = isLocal;
+  upvalue->offset = offset;
+  return c->function->upvalueCount++;
 }
 
 /// Compile a series of arguments for a call, returning the number of compiled arguments.

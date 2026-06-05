@@ -89,7 +89,7 @@ static void concatenate() {
 static bool callValue(const Value callee, const int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
-      case OBJ_FUNCTION: return callFun(AS_FUNCTION(callee), argCount);
+      case OBJ_CLOSURE: return callFun(AS_CLOSURE(callee), argCount);
       case OBJ_NATIVE: {
         const ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
 
@@ -112,10 +112,11 @@ static bool callValue(const Value callee, const int argCount) {
   return false;
 }
 
-/// Call the given [function] using the top [argCount] stack values as arguments.
-static bool callFun(ObjFunction* function, const int argCount) {
-  if (argCount != function->arity) {
-    runtimeError("Expected %d arguments but got %d.", function->arity, argCount);
+/// Call the given function [closure] using the top [argCount] stack values as
+/// arguments.
+static bool callFun(ObjClosure* closure, const int argCount) {
+  if (argCount != closure->function->arity) {
+    runtimeError("Expected %d arguments but got %d.", closure->function->arity, argCount);
     return false;
   }
 
@@ -124,13 +125,18 @@ static bool callFun(ObjFunction* function, const int argCount) {
     return false;
   }
 
-  // Initialize call frame for the given function
+  // Initialize call frame for the given function closure
   CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->function = function;
-  frame->ip = function->chunk.instructions;
+  frame->closure = closure;
+  frame->ip = closure->function->chunk.instructions;
   frame->slots = vm.stackTop - 1 - argCount;
 
   return true;
+}
+
+static ObjUpvalue* captureLocalUpvalue(Value* local) {
+  ObjUpvalue* upvalue = newUpvalue(local);
+  return upvalue;
 }
 
 /// Interpret the given lox source code text.
@@ -141,11 +147,15 @@ InterpretResult interpret(const char* source) {
   ObjFunction* function = compile(source);
   if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
-  // Push root function to slot 0 on the stack
+  // Push root function to slot 0 on the stack to keep it safe from GC while we
+  // wrap it in a closure, with which we then replace the function in slot 0
   push(OBJ_VAL(function));
+  ObjClosure* closure = newClosure(function);
+  pop();
+  push(OBJ_VAL(closure));
 
   // Initialize the call frame for the root function
-  callFun(function, 0);
+  callFun(closure, 0);
 
   return run();
 }
@@ -163,7 +173,7 @@ static InterpretResult run() {
   #define READ_SHORT() (frame->ip += 2, (uint16_t)(frame->ip[-2] << 8 | frame->ip[-1]))
 
   /// Read the constant value at the offset obtained by reading the next byte.
-  #define READ_CONSTANT() frame->function->chunk.constants.values[READ_BYTE()]
+  #define READ_CONSTANT() frame->closure->function->chunk.constants.values[READ_BYTE()]
 
   /// Read the string constant value at the offset obtained by reading the next byte.
   #define READ_STRING() AS_STRING(READ_CONSTANT())
@@ -194,8 +204,8 @@ static InterpretResult run() {
     printf("\n");
 
     disassembleInstruction(
-      &frame->function->chunk,
-      (int)(frame->ip - frame->function->chunk.instructions)
+      &frame->closure->function->chunk,
+      (int)(frame->ip - frame->closure->function->chunk.instructions)
     );
     #endif
 
@@ -245,26 +255,6 @@ static InterpretResult run() {
       case OP_POP: DO(pop());
       case OP_POP_N: DO(popN(READ_BYTE()));
 
-      // Local variable get expression op. Reads the local variable from its stack
-      // slot (obtained from the operand) and pushes it to the top of stack.
-      //
-      // The variable's value already exists on the stack in the slot from when it
-      // was declared, which will be modified in-place by OP_SET_LOCAL and will stay on
-      // the stack until the local goes out of scope.
-      //
-      // In contrast, the value we're pushing to the top of the stack here is the
-      // result of variable get expression and will be consumed by the enclosing
-      // expression (or discarded at the end of a statement)
-      case OP_GET_LOCAL: DO(push(frame->slots[READ_BYTE()]));
-
-      // Local variable set expression op. Assigns the value at the top of the stack
-      // to the stack slot where the local variable lives (obtained from the operand).
-      //
-      // The stack-top value stays because it is also the result of the assignment
-      // expression and will be popped when consumed by further expressions (or at
-      // the end of the statement if the assignment is an expression statement)
-      case OP_SET_LOCAL: DO(frame->slots[READ_BYTE()] = peek(0));
-
       // Global variable declaration statement expression op. Assigns the value at
       // the top of the stack to the global variable with the identifier string
       // obtained from the operand. The value will be popped off of the stack after
@@ -277,7 +267,7 @@ static InterpretResult run() {
       }
 
       // Global variable set expression op, leaves value on the stack for the same
-      // reasons described in the notes for OP_SET_LOCAL above
+      // reasons described in the notes for OP_SET_LOCAL below
       case OP_SET_GLOBAL: {
         ObjString* name = READ_STRING();
         if (tableSet(&vm.globals, name, peek(0))) {
@@ -300,6 +290,40 @@ static InterpretResult run() {
         }
 
         push(value);
+        break;
+      }
+
+      // Local variable set expression op. Assigns the value at the top of the stack
+      // to the stack slot where the local variable lives (obtained from the operand).
+      //
+      // The stack-top value stays because it is also the result of the assignment
+      // expression and will be popped when consumed by further expressions (or at
+      // the end of the statement if the assignment is an expression statement)
+      case OP_SET_LOCAL: DO(frame->slots[READ_BYTE()] = peek(0));
+
+      // Local variable get expression op. Reads the local variable from its stack
+      // slot (obtained from the operand) and pushes it to the top of stack.
+      //
+      // The variable's value already exists on the stack in the slot from when it
+      // was declared, which will be modified in-place by OP_SET_LOCAL and will stay on
+      // the stack until the local goes out of scope.
+      //
+      // In contrast, the value we're pushing to the top of the stack here is the
+      // result of variable get expression and will be consumed by the enclosing
+      // expression (or discarded at the end of a statement)
+      case OP_GET_LOCAL: DO(push(frame->slots[READ_BYTE()]));
+
+      // Set the upvalue obtained from the operand byte.
+      case OP_SET_UPVALUE: {
+        const uint8_t slot = READ_BYTE();
+        *frame->closure->upvalues[slot]->location = peek(0);
+        break;
+      }
+
+      // Pull an upvalue from the current closure and push it to the stack.
+      case OP_GET_UPVALUE: {
+        const uint8_t slot = READ_BYTE();
+        push(*frame->closure->upvalues[slot]->location);
         break;
       }
 
@@ -349,6 +373,28 @@ static InterpretResult run() {
         break;
       }
 
+      // Obtain lox function pointer from operand (constants table offset), wrap
+      // it in a closure object and push it to the stack
+      case OP_CLOSURE: {
+        ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+        ObjClosure* closure = newClosure(function);
+        push(OBJ_VAL(closure));
+
+        // Capture upvalues from enclosing scopes
+        for (int i = 0; i < function->upvalueCount; i++) {
+          const uint8_t isLocal = READ_BYTE();
+          const uint8_t offset = READ_BYTE();
+          if (isLocal) {
+            // Capture local upvalue from the surrounding call frame
+            Value* upvaluePtr = frame->slots + offset;
+            closure->upvalues[i] = captureLocalUpvalue(upvaluePtr);
+          } else {
+            closure->upvalues[i] = frame->closure->upvalues[offset];
+          }
+        }
+        break;
+      }
+
       // Return from the current call frame, pushing the result to the stack
       case OP_RETURN: {
         const Value result = pop();
@@ -394,7 +440,7 @@ static void runtimeError(const char* format, ...) {
   // Print stack trace
   for (int i = vm.frameCount - 1; i >= 0; i--) {
     const CallFrame* frame = &vm.frames[i];
-    const ObjFunction* function = frame->function;
+    const ObjFunction* function = frame->closure->function;
     const size_t instruction = frame->ip - function->chunk.instructions;
 
     fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);

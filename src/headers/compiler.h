@@ -26,6 +26,12 @@ typedef struct Local {
   int depth;
 } Local;
 
+/// Represents a surrounding variable captured in a function closure.
+typedef struct Upvalue {
+  uint8_t offset;
+  bool isLocal;
+} Upvalue;
+
 typedef struct Compiler Compiler;
 
 /// Holds data for compiling lox source code into bytecode.
@@ -50,6 +56,9 @@ struct Compiler {
 
   /// Current number of local variables in scope at a given point during compilation.
   int localCount;
+
+  /// Array of upvalues in the currently compiling function.
+  Upvalue upvalues[UINT8_COUNT];
 
   /// Current scope depth at a given point during compilation.
   int scopeDepth;
@@ -138,7 +147,7 @@ static void literal(bool);
 static void number(bool);
 static void string(bool);
 static void variable(bool canAssign);
-static void variableGetSet(Token token, bool canAssign);
+static void variableGetSet(Token identifier, bool canAssign);
 static void grouping(bool);
 static void call(bool);
 
@@ -147,9 +156,11 @@ static ParseRule* getRule(TokenType type);
 static uint8_t variableIdentifier(const char* expect);
 static void defineVariable(uint8_t identConstOffset);
 static void declareLocal();
-static int resolveLocal(const Compiler* cmp, const Token* identifier);
+static int resolveLocal(const Compiler* c, const Token* identifier);
 static void addLocal(Token identifier);
 static void markDefined();
+static int resolveUpvalue(Compiler* c, const Token* identifier);
+static int addUpvalue(Compiler* c, uint8_t offset, bool isLocal);
 static uint8_t argumentList();
 
 static uint8_t makeConstant(Value value);

@@ -6,6 +6,9 @@
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;
+typedef struct ObjClosure ObjClosure;
+typedef struct ObjUpvalue ObjUpvalue;
+typedef struct ObjNative ObjNative;
 
 /// Type tags of possible lox value types.
 typedef enum ValueType {

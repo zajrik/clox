@@ -1,6 +1,8 @@
 #include <stdio.h>
 
 #include "headers/debug.h"
+
+#include "object.h"
 #include "headers/value.h"
 
 /// Print the contents (instructions, values, etc.) of the chunk at address [chunk].
@@ -55,12 +57,15 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_POP: return simpleInstruction("OP_POP", offset);
     case OP_POP_N: return byteInstruction("OP_POP_N", chunk, offset);
 
-    case OP_GET_LOCAL: return byteInstruction("OP_GET_LOCAL", chunk, offset);
-    case OP_SET_LOCAL: return byteInstruction("OP_SET_LOCAL", chunk, offset);
-
     case OP_DEFINE_GLOBAL: return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL: return constantInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_GET_GLOBAL: return constantInstruction("OP_GET_GLOBAL", chunk, offset);
+
+    case OP_SET_LOCAL: return byteInstruction("OP_SET_LOCAL", chunk, offset);
+    case OP_GET_LOCAL: return byteInstruction("OP_GET_LOCAL", chunk, offset);
+
+    case OP_SET_UPVALUE: return byteInstruction("OP_SET_UPVALUE", chunk, offset);
+    case OP_GET_UPVALUE: return byteInstruction("OP_GET_UPVALUE", chunk, offset);
 
     case OP_PRINT: return simpleInstruction("OP_PRINT", offset);
 
@@ -71,6 +76,29 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_LOOP: return jumpInstruction("OP_LOOP", -1, chunk, offset);
 
     case OP_CALL: return byteInstruction("OP_CALL", chunk, offset);
+
+    case OP_CLOSURE: {
+      int newOffset = offset + 1;
+      const uint8_t constant = chunk->instructions[newOffset++];
+      const Value funConstant = chunk->constants.values[constant];
+      printf("%-16s %4d ", "OP_CLOSURE", constant);
+      printValue(funConstant);
+      printf("\n");
+
+      const ObjFunction* function = AS_FUNCTION(funConstant);
+      for (int i = 0; i < function->upvalueCount; i++) {
+        const int isLocal = chunk->instructions[newOffset++];
+        const int upvalue = chunk->instructions[newOffset++];
+        printf(
+          "%04d      |                     %s %d\n",
+          newOffset - 2,
+          isLocal ? "local" : "upvalue",
+          upvalue
+        );
+      }
+
+      return newOffset;
+    }
 
     case OP_RETURN: return simpleInstruction("OP_RETURN", offset);
 

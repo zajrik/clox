@@ -13,7 +13,7 @@
 /// live and to track instruction execution within the function itself.
 typedef struct CallFrame {
   /// The function being invoked.
-  ObjFunction* function;
+  ObjClosure* closure;
 
   /// Instruction pointer, points to the next instruction in the function to be
   /// read and executed.
@@ -69,7 +69,8 @@ Value pop();
 static Value peek(int distance);
 static void concatenate();
 static bool callValue(Value callee, int argCount);
-static bool callFun(ObjFunction* function, int argCount);
+static bool callFun(ObjClosure* closure, int argCount);
+static ObjUpvalue* captureLocalUpvalue(Value* local);
 
 InterpretResult interpret(const char* source);
 static InterpretResult run();

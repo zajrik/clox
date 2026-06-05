@@ -68,15 +68,27 @@ typedef enum OpCode {
   OP_SET_LOCAL,
   OP_GET_LOCAL,
 
+  OP_SET_UPVALUE,
+  OP_GET_UPVALUE,
+
   OP_JUMP_IF_FALSE,
   OP_JUMP_IF_TRUE,
   OP_JUMP_IF_NOT_NIL,
   OP_JUMP,
   OP_LOOP,
 
+  /// Call a function on the stack. Must be followed by an operand specifying
+  /// how many arguments are to be passed to the function.
+  ///
+  /// The function value will be on the stack, followed by all of its argument
+  /// values.
   OP_CALL,
 
-  /// Return something eventually.
+  /// Create a closure at runtime. Must be followed by an operand specifying a
+  /// constants table offset pointing to a function value.
+  OP_CLOSURE,
+
+  /// Return a value (or nothing) from a function.
   OP_RETURN,
 } OpCode;
 
