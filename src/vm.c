@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 
 #include "headers/vm.h"
 #include "headers/common.h"
@@ -17,6 +18,8 @@ void initVm() {
   vm.objects = NULL;
   initTable(&vm.strings);
   initTable(&vm.globals);
+
+  defineNative("clock", clockNative, 0);
 }
 
 /// Free resources used by the virtual machine. (eventually)
@@ -87,6 +90,21 @@ static bool callValue(const Value callee, const int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_FUNCTION: return callFun(AS_FUNCTION(callee), argCount);
+      case OBJ_NATIVE: {
+        const ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
+
+        if (argCount != nativeObj->arity) {
+          runtimeError("Expected %d arguments but got %d.", nativeObj->arity, argCount);
+          return false;
+        }
+
+        const NativeFn nativeFun = nativeObj->function;
+        const Value result = nativeFun(argCount, vm.stackTop - argCount);
+        vm.stackTop -= argCount + 1;
+        push(result);
+        return true;
+      }
+
       default: break;
     }
   }
@@ -111,7 +129,7 @@ static bool callFun(ObjFunction* function, const int argCount) {
   frame->function = function;
   frame->ip = function->chunk.instructions;
   frame->slots = vm.stackTop - 1 - argCount;
-  
+
   return true;
 }
 
@@ -388,4 +406,19 @@ static void runtimeError(const char* format, ...) {
   }
 
   resetStack();
+}
+
+// Native functions ===========================================================
+
+static void defineNative(const char* name, const NativeFn function, const int arity) {
+  // Copy name string, pushing it and native function to the stack so they can't
+  // be garbage-collected before we're done defining the native function
+  push(OBJ_VAL(copyString(name, (int)strlen(name))));
+  push(OBJ_VAL(newNative(function, arity)));
+  tableSet(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+  popN(2);
+}
+
+static Value clockNative(int argCount, Value* args) {
+  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }

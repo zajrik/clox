@@ -74,6 +74,9 @@ static bool callFun(ObjFunction* function, int argCount);
 InterpretResult interpret(const char* source);
 static InterpretResult run();
 
+static void defineNative(const char* name, NativeFn function, int arity);
+static Value clockNative(int argCount, Value* args);
+
 static void runtimeError(const char* format, ...);
 
 #endif

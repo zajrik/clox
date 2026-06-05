@@ -104,11 +104,20 @@ ObjFunction* newFunction(const FunctionType type) {
   return function;
 }
 
+/// Allocates a new [ObjNative] and returns a pointer to it.
+ObjNative* newNative(const NativeFn function, const int arity) {
+  ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+  native->arity = arity;
+  native->function = function;
+  return native;
+}
+
 /// Print the given lox object value.
 void printObject(const Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
     case OBJ_FUNCTION: DO(printFunction(AS_FUNCTION(value)));
+    case OBJ_NATIVE: DO(printf("<native fun>"));
   }
 }
 
