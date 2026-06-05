@@ -78,6 +78,43 @@ static void concatenate() {
   push(OBJ_VAL(takeString(chars, length)));
 }
 
+/// Attempt to call the given [callee] as a function using the top [argCount] values
+/// from the stack as its arguments.
+///
+/// Emits a runtime error if [callee] is not a callable function, method, or class
+/// initializer.
+static bool callValue(const Value callee, const int argCount) {
+  if (IS_OBJ(callee)) {
+    switch (OBJ_TYPE(callee)) {
+      case OBJ_FUNCTION: return callFun(AS_FUNCTION(callee), argCount);
+      default: break;
+    }
+  }
+  runtimeError("Can only call functions, methods, and class initializers.");
+  return false;
+}
+
+/// Call the given [function] using the top [argCount] stack values as arguments.
+static bool callFun(ObjFunction* function, const int argCount) {
+  if (argCount != function->arity) {
+    runtimeError("Expected %d arguments but got %d.", function->arity, argCount);
+    return false;
+  }
+
+  if (vm.frameCount == FRAME_MAX) {
+    runtimeError("Stack overflow.");
+    return false;
+  }
+
+  // Initialize call frame for the given function
+  CallFrame* frame = &vm.frames[vm.frameCount++];
+  frame->function = function;
+  frame->ip = function->chunk.instructions;
+  frame->slots = vm.stackTop - 1 - argCount;
+  
+  return true;
+}
+
 /// Interpret the given lox source code text.
 ///
 /// Code will be compiled and then run on the virtual machine.
@@ -90,10 +127,7 @@ InterpretResult interpret(const char* source) {
   push(OBJ_VAL(function));
 
   // Initialize the call frame for the root function
-  CallFrame* frame = &vm.frames[vm.frameCount++];
-  frame->function = function;
-  frame->ip = function->chunk.instructions;
-  frame->slots = vm.stack;
+  callFun(function, 0);
 
   return run();
 }
@@ -286,9 +320,39 @@ static InterpretResult run() {
         break;
       }
 
-      case OP_RETURN:
-        // Exit interpreter
-        return INTERPRET_OK;
+      case OP_CALL: {
+        const int argCount = READ_BYTE();
+        if (!callValue(peek(argCount), argCount)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        // Update call frame to begin executing the called function
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+
+      // Return from the current call frame, pushing the result to the stack
+      case OP_RETURN: {
+        const Value result = pop();
+
+        // Pop the call frame off the frame stack. If this was the outermost frame,
+        // everything ran successfully, and we can exit the program
+        vm.frameCount--;
+        if (vm.frameCount == 0) {
+          pop();
+          return INTERPRET_OK;
+        }
+
+        // Discard frame stack by setting the stack top back to the frame's first
+        // stack slot address
+        vm.stackTop = frame->slots;
+
+        push(result);
+
+        // Set frame to the topmost call frame (the previous frame)
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
 
       default:
         return INTERPRET_RUNTIME_ERROR;
@@ -309,15 +373,19 @@ static void runtimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  // Find the instruction that failed.
-  //
-  // ip points to the next instruction to be read, chunk.instructions is the address
-  // of the first instruction. Subtracting those provides the offset of the next
-  // instruction to be read
-  const CallFrame* frame = &vm.frames[vm.frameCount - 1];
-  const size_t instruction = frame->ip - frame->function->chunk.instructions - 1;
-  const int line = frame->function->chunk.lines[instruction];
+  // Print stack trace
+  for (int i = vm.frameCount - 1; i >= 0; i--) {
+    const CallFrame* frame = &vm.frames[i];
+    const ObjFunction* function = frame->function;
+    const size_t instruction = frame->ip - function->chunk.instructions;
 
-  fprintf(stderr, "[line %d] in script\n", line);
+    fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+    if (function->identifier == NULL) {
+      fprintf(stderr, "script\n");
+    } else {
+      fprintf(stderr, "%s()\n", function->identifier->chars);
+    }
+  }
+
   resetStack();
 }

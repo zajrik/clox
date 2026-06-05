@@ -76,9 +76,11 @@ ObjFunction* compile(const char* source) {
   return !parser.hadError ? fun : NULL;
 }
 
-/// End the compilation process.
+/// End the compilation process for the currently compiling function/script.
 static ObjFunction* endCompilation() {
-  emitReturn();
+  // End script with a return to exit gracefully
+  if (compiler->type == TYPE_SCRIPT) emitNilReturn();
+
   ObjFunction* fun = compiler->function;
 
   #ifdef DEBUG_PRINT_CODE
@@ -187,7 +189,7 @@ void scope(const StmtFn rule) {
 
 // Statement parse/compilation functions ======================================
 
-/// Parses/compiles a declaration statement from scanned tokens.
+/// Compiles a declaration statement from scanned tokens.
 ///
 /// declaration := varDecl | statement ;
 static void declaration() {
@@ -203,7 +205,7 @@ static void declaration() {
 
 /// Compiles a function declaration from scanned tokens.
 static void functionDeclaration() {
-  const uint8_t identOffset = parseVariableIdent("Expected function name.");
+  const uint8_t identOffset = variableIdentifier("Expected function name.");
 
   // Mark function as defined so it can refer to itself.
   markDefined();
@@ -214,7 +216,7 @@ static void functionDeclaration() {
 
 /// Compiles a variable declaration statement from scanned tokens.
 static void variableDeclaration() {
-  const uint8_t identOffset = parseVariableIdent("Expected variable name.");
+  const uint8_t identOffset = variableIdentifier("Expected variable name.");
 
   nextMatches(TOKEN_EQUAL) ? expression() : emitByte(OP_NIL);
   consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
@@ -224,22 +226,24 @@ static void variableDeclaration() {
 
 /// Compiles a statement from scanned tokens.
 ///
-/// statement := exprStmt | printStmt | ifStmt | block ;
+/// statement := exprStmt
+///              | printStmt
+///              | ifStmt
+///              | switchStmt
+///              | returnStmt
+///              | whileStmt
+///              | forStmt
+///              | block ;
 static void statement() {
-  if (nextMatches(TOKEN_PRINT)) {
-    printStatement();
-  } else if (nextMatches(TOKEN_IF)) {
-    ifStatement();
-  } else if (nextMatches(TOKEN_SWITCH)) {
-    switchStatement();
-  } else if (nextMatches(TOKEN_WHILE)) {
-    whileStatement();
-  } else if (nextMatches(TOKEN_FOR)) {
-    scope(forStatement);
-  } else if (nextMatches(TOKEN_LEFT_BRACE)) {
-    scope(block);
-  } else {
-    expressionStatement();
+  switch (nextType()) {
+    case TOKEN_PRINT: DO((advance(), printStatement()));
+    case TOKEN_IF: DO((advance(), ifStatement()));
+    case TOKEN_SWITCH: DO((advance(), switchStatement()));
+    case TOKEN_RETURN: DO((advance(), returnStatement()));
+    case TOKEN_WHILE: DO((advance(), whileStatement()));
+    case TOKEN_FOR: DO((advance(), scope(forStatement)));
+    case TOKEN_LEFT_BRACE: DO((advance(), scope(block)));
+    default: expressionStatement();
   }
 }
 
@@ -348,6 +352,21 @@ static void switchStatement() {
   emitByte(OP_POP);
 }
 
+/// Compiles a return statement from scanned tokens.
+static void returnStatement() {
+  if (compiler->type == TYPE_SCRIPT) {
+    error("Can't return from top-level code.");
+  }
+
+  if (nextMatches(TOKEN_SEMICOLON)) {
+    emitNilReturn();
+  } else {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expected ';' after return value.");
+    emitByte(OP_RETURN);
+  }
+}
+
 /// Compiles a while statement from scanned tokens.
 ///
 /// whileStmt := "while" "(" expression ")" statement ;
@@ -453,7 +472,7 @@ static void function(const FunctionType type) {
       if (compiler->function->arity > 255) {
         errorAtNext("Can't have more than 255 parameters.");
       }
-      const uint8_t param = parseVariableIdent("Expected parameter identifier.");
+      const uint8_t param = variableIdentifier("Expected parameter identifier.");
       defineVariable(param);
     } while (nextMatches(TOKEN_COMMA));
   }
@@ -468,7 +487,7 @@ static void function(const FunctionType type) {
 
 // Expression parse/compilation functions =====================================
 
-/// Parses an expression from scanned tokens following the given [precedence],
+/// Compiles an expression from scanned tokens following the given [precedence],
 /// emitting bytecode for all operations in the parsed expression.
 static void expr(const Precedence precedence) {
   advance();
@@ -509,14 +528,14 @@ static void expr(const Precedence precedence) {
   }
 }
 
-/// Parses an expression, emitting compiled expression bytecode.
+/// Compiles an expression, emitting compiled expression bytecode.
 static void expression() {
   expr(PREC_ASSIGNMENT);
 }
 
-/// Parses a unary expression, emitting bytecode for the operand expression
+/// Compiles a unary expression, emitting bytecode for the operand expression
 /// and operator.
-static void unary(const bool _) {
+static void unary(bool _) {
   const TokenType operatorType = currentType();
 
   // Compile the operand expression
@@ -530,12 +549,12 @@ static void unary(const bool _) {
   }
 }
 
-/// Parses a binary expression, emitting bytecode for the operand expressions
+/// Compiles a binary expression, emitting bytecode for the operand expressions
 /// and the operator.
 ///
 /// The left-hand operand of the binary expression has already been compiled to
 /// the chunk at the point this will be called.
-static void binary(const bool _) {
+static void binary(bool _) {
   const TokenType operatorType = currentType();
   const ParseRule* operatorRule = getRule(operatorType);
 
@@ -643,8 +662,8 @@ static void switchExpr(bool _) {
   patchJumps(&exit);
 }
 
-/// Parses a keyword-literal expression, emitting the relevant opcode.
-static void literal(const bool _) {
+/// Compiles a keyword-literal expression, emitting the relevant opcode.
+static void literal(bool _) {
   switch (currentType()) {
     case TOKEN_NIL: return emitByte(OP_NIL);
     case TOKEN_TRUE: return emitByte(OP_TRUE);
@@ -653,14 +672,14 @@ static void literal(const bool _) {
   }
 }
 
-/// Parses a number constant, emitting bytecode for a constant number value.
-static void number(const bool _) {
+/// Compiles a number constant, emitting bytecode for a constant number value.
+static void number(bool _) {
   const double value = strtod(parser.current.start, NULL);
   emitConstant(NUMBER_VAL(value));
 }
 
-/// Parses a string constant, emitting bytecode for a constant string value.
-static void string(const bool _) {
+/// Compiles a string constant, emitting bytecode for a constant string value.
+static void string(bool _) {
   const char* stringStart = parser.current.start + 1;
   const int stringLength = parser.current.length - 2;
   emitConstant(OBJ_VAL(copyString(stringStart, stringLength)));
@@ -668,12 +687,12 @@ static void string(const bool _) {
 
 /// Compiles a variable/identifier expression.
 static void variable(const bool canAssign) {
-  namedVariable(parser.current, canAssign);
+  variableGetSet(parser.current, canAssign);
 }
 
 /// Compiles a variable/identifier get/set expression, emitting bytecode to fetch/set
 /// the value for that variable/identifier.
-static void namedVariable(const Token token, const bool canAssign) {
+static void variableGetSet(const Token token, const bool canAssign) {
   uint8_t getOp, setOp;
 
   int varOffset = resolveLocal(compiler, &token);
@@ -694,10 +713,16 @@ static void namedVariable(const Token token, const bool canAssign) {
   emitBytes(getOp, (uint8_t)varOffset);
 }
 
-/// Parses a grouping expression, emitting bytecode for the grouped expression.
-static void grouping(const bool _) {
+/// Compiles a grouping expression, emitting bytecode for the grouped expression.
+static void grouping(bool _) {
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expected ')' after expression");
+}
+
+/// Compiles a function call expression.
+static void call(bool _) {
+  const uint8_t argCount = argumentList();
+  emitBytes(OP_CALL, argCount);
 }
 
 // @formatter:off
@@ -705,7 +730,7 @@ static void grouping(const bool _) {
 static ParseRule rules[] = {
   // Single character token rules
   // [TokenType]        = {prefix,     infix,    Precedence      },
-  [TOKEN_LEFT_PAREN]    = {grouping,   NULL,     PREC_NONE       },
+  [TOKEN_LEFT_PAREN]    = {grouping,   call,     PREC_CALL       },
   [TOKEN_RIGHT_PAREN]   = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_LEFT_BRACE]    = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,     PREC_NONE       },
@@ -770,11 +795,11 @@ static ParseRule* getRule(const TokenType type) {
 
 // Variable parse/compilation/management functions ============================
 
-/// Parses a variable identifier, returning the offset to the constant string
+/// Compiles a variable identifier, returning the offset to the constant string
 /// for the variable's identifier in the current chunk's constants array.
 ///
 /// If the variable identifier cannot be parsed, errors with message [expect].
-static uint8_t parseVariableIdent(const char* expect) {
+static uint8_t variableIdentifier(const char* expect) {
   consume(TOKEN_IDENTIFIER, expect);
 
   // Declare variable if we're in a local scope. We just return 0 if so since
@@ -872,6 +897,27 @@ static void markDefined() {
   compiler->locals[compiler->localCount - 1].depth = compiler->scopeDepth;
 }
 
+/// Compile a series of arguments for a call, returning the number of compiled arguments.
+///
+/// Argument expressions will be on the stack after to be consumed by a call expression.
+static uint8_t argumentList() {
+  uint8_t count = 0;
+  if (!nextIs(TOKEN_RIGHT_PAREN)) {
+    do {
+      // Allow dangling comma
+      if (nextIs(TOKEN_RIGHT_PAREN)) break;
+
+      expression();
+
+      if (count++ == 255) {
+        error("A function call may only have up to 255 arguments.");
+      }
+    } while (nextMatches(TOKEN_COMMA));
+  }
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after arguments.");
+  return count;
+}
+
 // Chunk writing ==============================================================
 
 /// Add [value] to the constants in the chunk currently being compiled.
@@ -911,9 +957,9 @@ static void emitConstant(const Value value) {
   emitBytes(OP_CONSTANT, makeConstant(value));
 }
 
-/// Write [OP_RETURN] to the chunk currently being compiled.
-static void emitReturn() {
-  emitByte(OP_RETURN);
+/// Write [OP_NIL], [OP_RETURN] to the chunk currently being compiled.
+static void emitNilReturn() {
+  emitBytes(OP_NIL, OP_RETURN);
 }
 
 /// Write a jump [opcode] followed by placeholder bytes for the jump offset operand.

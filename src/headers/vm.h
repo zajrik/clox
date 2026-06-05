@@ -67,6 +67,9 @@ void push(Value value);
 Value pop();
 
 static Value peek(int distance);
+static void concatenate();
+static bool callValue(Value callee, int argCount);
+static bool callFun(ObjFunction* function, int argCount);
 
 InterpretResult interpret(const char* source);
 static InterpretResult run();

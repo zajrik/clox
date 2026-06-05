@@ -119,6 +119,7 @@ static void expressionStatement();
 static void printStatement();
 static void ifStatement();
 static void switchStatement();
+static void returnStatement();
 static void whileStatement();
 static void forStatement();
 static void block();
@@ -137,24 +138,26 @@ static void literal(bool);
 static void number(bool);
 static void string(bool);
 static void variable(bool canAssign);
-static void namedVariable(Token token, bool canAssign);
+static void variableGetSet(Token token, bool canAssign);
 static void grouping(bool);
+static void call(bool);
 
 static ParseRule* getRule(TokenType type);
 
-static uint8_t parseVariableIdent(const char* expect);
+static uint8_t variableIdentifier(const char* expect);
 static void defineVariable(uint8_t identConstOffset);
 static void declareLocal();
 static int resolveLocal(const Compiler* cmp, const Token* identifier);
 static void addLocal(Token identifier);
 static void markDefined();
+static uint8_t argumentList();
 
 static uint8_t makeConstant(Value value);
 static uint8_t makeIdentConstant(const Token* token);
 static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
-static void emitReturn();
+static void emitNilReturn();
 
 static int emitJump(OpCode opcode);
 static void patchJump(int offset);

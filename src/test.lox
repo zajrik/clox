@@ -1,10 +1,10 @@
 {
-  var a;
+  var a = 12;
   print a;
 
-  fun foo(x, y, z) {
-    print x + y + z;
+  fun foo(x, y, z,) {
+    return x + y + z;
   }
 
-  print foo;
+  print a + foo(10, 20, 30,);
 }

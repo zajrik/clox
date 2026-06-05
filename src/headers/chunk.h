@@ -74,6 +74,8 @@ typedef enum OpCode {
   OP_JUMP,
   OP_LOOP,
 
+  OP_CALL,
+
   /// Return something eventually.
   OP_RETURN,
 } OpCode;
