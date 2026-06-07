@@ -65,9 +65,14 @@ typedef struct ObjClosure {
   int upvalueCount;
 } ObjClosure;
 
+/// Represents a variable captured in a closure.
 typedef struct ObjUpvalue {
   Obj object;
   Value* location;
+  ObjUpvalue* next;
+
+  /// The closed-over value of this upvalue.
+  Value closed;
 } ObjUpvalue;
 
 /// Represents a pointer to a native function callable from lox code.

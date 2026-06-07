@@ -46,6 +46,12 @@ typedef struct Vm {
   /// Hash-table of all global-scoped program variables.
   Table globals;
 
+  /// Pointer to the head of a linked list of open upvalues to be closed over and
+  /// hoisted to the heap when they go out of scope.
+  ///
+  /// The upvalues are ordered to match their order on the stack
+  ObjUpvalue* openUpvalues;
+
   /// Linked list of allocated lox objects.
   Obj* objects;
 } Vm;
@@ -63,14 +69,14 @@ void initVm();
 void freeVm();
 
 static void resetStack();
-void push(Value value);
-Value pop();
+static void push(Value value);
+static Value pop();
 
 static Value peek(int distance);
 static void concatenate();
 static bool callValue(Value callee, int argCount);
 static bool callFun(ObjClosure* closure, int argCount);
-static ObjUpvalue* captureLocalUpvalue(Value* local);
+static ObjUpvalue* captureUpvalue(Value* local);
 
 InterpretResult interpret(const char* source);
 static InterpretResult run();

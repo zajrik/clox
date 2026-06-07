@@ -36,13 +36,14 @@ void freeVm() {
 static void resetStack() {
   vm.stackTop = vm.stack;
   vm.frameCount = 0;
+  vm.openUpvalues = NULL;
 }
 
 /// Push [value] to the top of the vm stack.
 ///
 /// Inserts the value into memory at the address pointed to by [vm.stackTop] and
 /// increments the stack top pointer to point to the next open slot on the stack.
-void push(const Value value) {
+static void push(const Value value) {
   *vm.stackTop++ = value;
 }
 
@@ -51,7 +52,7 @@ void push(const Value value) {
 /// Decrements the stack top pointer and returns the value at the decremented
 /// address (points to the top value in the stack which can safely be overwritten
 /// when a value is next pushed).
-Value pop() {
+static Value pop() {
   return *--vm.stackTop;
 }
 
@@ -59,6 +60,25 @@ Value pop() {
 void popN(const uint8_t n) {
   vm.stackTop -= n;
 }
+
+/// Hoist a value and any upvalues above it on the stack off of the stack and onto
+/// the heap.
+static void closeUpvalues(const Value* last) {
+  while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
+    ObjUpvalue* upvalue = vm.openUpvalues;
+
+    // Close the open upvalue with a copy of its value from the stack, then set
+    // the upvalue location to point to the copy, allowing the closed-over value
+    // to be accessed and modified within the upvalue on the heap
+    upvalue->closed = *upvalue->location;
+    upvalue->location = &upvalue->closed;
+
+    // Drop the now-closed upvalue from the open upvalues list
+    vm.openUpvalues = upvalue->next;
+  }
+}
+
+// void hoistN(const uint8_t n) {}
 
 /// Peek at a value in the stack, offset by [distance] from the top of the stack.
 static Value peek(const int distance) {
@@ -134,9 +154,38 @@ static bool callFun(ObjClosure* closure, const int argCount) {
   return true;
 }
 
-static ObjUpvalue* captureLocalUpvalue(Value* local) {
-  ObjUpvalue* upvalue = newUpvalue(local);
-  return upvalue;
+/// Capture an upvalue from the given [local] value pointer.
+///
+/// Attempts to find an existing upvalue for the given local before creating one.
+static ObjUpvalue* captureUpvalue(Value* local) {
+  // Start at the head of the open upvalues list
+  ObjUpvalue* upvalue = NULL;
+  ObjUpvalue* nextUpvalue = vm.openUpvalues;
+
+  // Walk the open upvalues list, exiting if we hit the end of the list, or after
+  // we encounter an upvalue with a slot past the given local
+  while (nextUpvalue != NULL && nextUpvalue->location > local) {
+    upvalue = nextUpvalue;
+    nextUpvalue = nextUpvalue->next;
+  }
+
+  // If we find an upvalue matching the given local, return it
+  if (nextUpvalue != NULL && nextUpvalue->location == local) {
+    return nextUpvalue;
+  }
+
+  // Otherwise create a new upvalue and insert it into the open upvalues list, sorted
+  // relative to its position on the stack
+  ObjUpvalue* createdUpvalue = newUpvalue(local);
+  createdUpvalue->next = nextUpvalue;
+
+  if (upvalue == NULL) {
+    vm.openUpvalues = createdUpvalue;
+  } else {
+    upvalue->next = createdUpvalue;
+  }
+
+  return createdUpvalue;
 }
 
 /// Interpret the given lox source code text.
@@ -207,6 +256,7 @@ static InterpretResult run() {
       &frame->closure->function->chunk,
       (int)(frame->ip - frame->closure->function->chunk.instructions)
     );
+    fflush(stdout);
     #endif
 
     switch (READ_BYTE()) {
@@ -254,6 +304,8 @@ static InterpretResult run() {
       case OP_COPY: DO(push(peek(0)));
       case OP_POP: DO(pop());
       case OP_POP_N: DO(popN(READ_BYTE()));
+
+      case OP_CLOSE_UPVALUE: DO(closeUpvalues(vm.stackTop - 1), pop());
 
       // Global variable declaration statement expression op. Assigns the value at
       // the top of the stack to the global variable with the identifier string
@@ -387,7 +439,7 @@ static InterpretResult run() {
           if (isLocal) {
             // Capture local upvalue from the surrounding call frame
             Value* upvaluePtr = frame->slots + offset;
-            closure->upvalues[i] = captureLocalUpvalue(upvaluePtr);
+            closure->upvalues[i] = captureUpvalue(upvaluePtr);
           } else {
             closure->upvalues[i] = frame->closure->upvalues[offset];
           }
@@ -398,6 +450,9 @@ static InterpretResult run() {
       // Return from the current call frame, pushing the result to the stack
       case OP_RETURN: {
         const Value result = pop();
+
+        // Close open upvalues in the current call frame
+        closeUpvalues(frame->slots);
 
         // Pop the call frame off the frame stack. If this was the outermost frame,
         // everything ran successfully, and we can exit the program

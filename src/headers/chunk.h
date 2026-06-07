@@ -58,6 +58,10 @@ typedef enum OpCode {
   /// Pop the top N values off of the stack, where N is the operand, discarding them.
   OP_POP_N,
 
+  /// Close upvalue on top of the stack, moving it to the heap and popping it from
+  /// the top of the stack.
+  OP_CLOSE_UPVALUE,
+
   /// Pop the top value off of the stack, printing it.
   OP_PRINT,
 

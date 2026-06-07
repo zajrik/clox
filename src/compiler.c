@@ -33,8 +33,8 @@ static void initCompiler(Compiler* c, const FunctionType type) {
 
   if (type != TYPE_SCRIPT) {
     compiler->function->identifier = copyString(
-      parser.current.start,
-      parser.current.length
+    parser.current.start,
+    parser.current.length
     );
   }
 
@@ -44,6 +44,7 @@ static void initCompiler(Compiler* c, const FunctionType type) {
   local->identifier.type = TOKEN_IDENTIFIER;
   local->identifier.start = "";
   local->identifier.length = 0;
+  local->isCaptured = false;
 }
 
 /// Returns a pointer to the currently compiling chunk.
@@ -86,8 +87,8 @@ static ObjFunction* endCompilation() {
   #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
     disassembleChunk(
-      currentChunk(),
-      fun->identifier != NULL ? fun->identifier->chars : "<script>"
+    currentChunk(),
+    fun->identifier != NULL ? fun->identifier->chars : "<script>"
     );
   } else {
     printf("errors occurred\n");
@@ -167,15 +168,18 @@ void pushScope() {
 /// End the current scope.
 void popScope() {
   compiler->scopeDepth--;
-  uint8_t poppedLocals = 0;
+  // uint8_t poppedLocals = 0;
 
-  while (compiler->localCount > 0
-    && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth) {
+  while (
+    compiler->localCount > 0
+    && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth
+  ) {
+    emitByte(compiler->locals[compiler->localCount - 1].isCaptured ? OP_CLOSE_UPVALUE : OP_POP);
     compiler->localCount--;
-    poppedLocals++;
+    // poppedLocals++;
   }
 
-  if (poppedLocals > 0) emitBytes(OP_POP_N, poppedLocals);
+  // if (poppedLocals > 0) emitBytes(OP_POP_N, poppedLocals);
 }
 
 /// Execute the given statement rule within a new scope.
@@ -191,7 +195,7 @@ void scope(const StmtFn rule) {
 
 /// Compiles a declaration statement from scanned tokens.
 ///
-/// declaration := varDecl | statement ;
+/// declaration := varDecl | funDecl | statement ;
 static void declaration() {
   if (nextMatches(TOKEN_FUN)) {
     functionDeclaration();
@@ -236,13 +240,13 @@ static void variableDeclaration() {
 ///              | block ;
 static void statement() {
   switch (nextType()) {
-    case TOKEN_PRINT: DO((advance(), printStatement()));
-    case TOKEN_IF: DO((advance(), ifStatement()));
-    case TOKEN_SWITCH: DO((advance(), switchStatement()));
-    case TOKEN_RETURN: DO((advance(), returnStatement()));
-    case TOKEN_WHILE: DO((advance(), whileStatement()));
-    case TOKEN_FOR: DO((advance(), scope(forStatement)));
-    case TOKEN_LEFT_BRACE: DO((advance(), scope(block)));
+    case TOKEN_PRINT: DO(advance(), printStatement());
+    case TOKEN_IF: DO(advance(), ifStatement());
+    case TOKEN_SWITCH: DO(advance(), switchStatement());
+    case TOKEN_RETURN: DO(advance(), returnStatement());
+    case TOKEN_WHILE: DO(advance(), whileStatement());
+    case TOKEN_FOR: DO(advance(), scope(forStatement));
+    case TOKEN_LEFT_BRACE: DO(advance(), scope(block));
     default: expressionStatement();
   }
 }
@@ -457,8 +461,8 @@ static void function(const FunctionType type) {
   initCompiler(&c, type);
 
   // Push scope for function. This does not need to be closed since the function
-  // being compiled has its own compiler instance which will discard the scope
-  // when compilation is complete
+  // being compiled has its own compiler instance which intrinsically discards its
+  // own scope when compilation ends and the compiler itself is discarded and freed
   pushScope();
 
   consume(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
@@ -894,6 +898,7 @@ static void addLocal(const Token identifier) {
   Local* local = &compiler->locals[compiler->localCount++];
   local->identifier = identifier;
   local->depth = -1;
+  local->isCaptured = false;
 }
 
 /// Mark the most recently declared local as defined/ready for use.
@@ -911,9 +916,13 @@ static int resolveUpvalue(Compiler* c, const Token* identifier) {
   // If this is the root scope, the upvalue must be global
   if (c->enclosing == NULL) return -1;
 
-  // Try to resolve an upvalue from locals in the enclosing scope
+  // Try to resolve an upvalue from locals in the enclosing scope. If a local is
+  // resolved, mark it as captured by a closure
   const int local = resolveLocal(c->enclosing, identifier);
-  if (local != -1) return addUpvalue(c, (uint8_t)local, true);
+  if (local != -1) {
+    c->enclosing->locals[local].isCaptured = true;
+    return addUpvalue(c, (uint8_t)local, true);
+  }
 
   // Try to resolve an upvalue from upvalues in the enclosing scope
   const int upvalue = resolveUpvalue(c->enclosing, identifier);

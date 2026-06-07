@@ -32,8 +32,8 @@ typedef struct Value {
 } Value;
 
 #define IS_BOOL(value) ((value).type == VAL_BOOL)
-#define IS_NIL(value) ((value).type == VAL_NIL)
 #define IS_NUMBER(value) ((value).type == VAL_NUMBER)
+#define IS_NIL(value) ((value).type == VAL_NIL)
 #define IS_OBJ(value) ((value).type == VAL_OBJ)
 
 #define AS_BOOL(value) ((value).as.boolean)
@@ -41,8 +41,10 @@ typedef struct Value {
 #define AS_OBJ(value) ((value).as.object)
 
 #define BOOL_VAL(value) ((Value){VAL_BOOL, {.boolean = (value)}})
-#define NIL_VAL ((Value){VAL_NIL, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = (value)}})
+
+/// Constant lox `nil` value.
+static const Value NIL_VAL = {VAL_NIL, {.number = 0}};
 
 /// Wraps the given [Obj] pointer into an object [Value].
 #define OBJ_VAL(objPtr) ((Value){VAL_OBJ, {.object = (Obj*)(objPtr)}})

@@ -56,6 +56,7 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_COPY: return simpleInstruction("OP_COPY", offset);
     case OP_POP: return simpleInstruction("OP_POP", offset);
     case OP_POP_N: return byteInstruction("OP_POP_N", chunk, offset);
+    case OP_CLOSE_UPVALUE: return simpleInstruction("OP_CLOSE_UPVALUE", offset);
 
     case OP_DEFINE_GLOBAL: return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL: return constantInstruction("OP_SET_GLOBAL", chunk, offset);
@@ -90,10 +91,10 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
         const int isLocal = chunk->instructions[newOffset++];
         const int upvalue = chunk->instructions[newOffset++];
         printf(
-          "%04d      |                     %s %d\n",
-          newOffset - 2,
-          isLocal ? "local" : "upvalue",
-          upvalue
+        "%04d      |                     %s %d\n",
+        newOffset - 2,
+        isLocal ? "local" : "upvalue",
+        upvalue
         );
       }
 

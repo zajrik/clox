@@ -22,8 +22,17 @@ typedef struct Parser {
 
 /// Represents the identifier and scope depth of a local variable.
 typedef struct Local {
+  /// Identifier string for this local variable.
   Token identifier;
+
+  /// Scope depth of this local variable.
+  ///
+  /// A scope depth of 0 is the innermost scope, 1 is the enclosing scope of the
+  /// innermost scope, etc.
   int depth;
+
+  /// Whether this local variable has been captured in a closure.
+  bool isCaptured;
 } Local;
 
 /// Represents a surrounding variable captured in a function closure.
