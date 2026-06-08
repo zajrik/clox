@@ -79,8 +79,9 @@ ObjFunction* compile(const char* source) {
 
 /// End the compilation process for the currently compiling function/script.
 static ObjFunction* endCompilation() {
-  // End script with a return to exit gracefully
-  if (compiler->type == TYPE_SCRIPT) emitNilReturn();
+  // Emit nil return to allow functions to return nil by default if they do not
+  // specify a return of their own
+  emitNilReturn();
 
   ObjFunction* fun = compiler->function;
 
