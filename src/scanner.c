@@ -110,9 +110,7 @@ static TokenType checkKeyword(
   if (tokenLength != keywordLength) return TOKEN_IDENTIFIER;
 
   // Compare remainder of token string
-  return memcmp(scanner.start + start, rest, length) == 0
-    ? type
-    : TOKEN_IDENTIFIER;
+  return memcmp(scanner.start + start, rest, length) == 0 ? type : TOKEN_IDENTIFIER;
 }
 
 /// Determines the token type of the currently-scanned identifier.
@@ -235,12 +233,18 @@ Token scanToken() {
     case ';': return makeToken(TOKEN_SEMICOLON);
     case ',': return makeToken(TOKEN_COMMA);
     case '.': return makeToken(TOKEN_DOT);
-    case '-': return makeToken(TOKEN_MINUS);
-    case '+': return makeToken(TOKEN_PLUS);
-    case '*': return makeToken(TOKEN_STAR);
-    case '/': return makeToken(TOKEN_SLASH);
 
-    case '?': return makeToken(match('?') ? TOKEN_NILISH : TOKEN_QUESTION);
+    case '*': return makeToken(match('=') ? TOKEN_STAR_EQUAL : TOKEN_STAR);
+    case '/': return makeToken(match('=') ? TOKEN_SLASH_EQUAL : TOKEN_SLASH);
+    case '-': return makeToken(match('=') ? TOKEN_MINUS_EQUAL : TOKEN_MINUS);
+    case '+': return makeToken(match('=') ? TOKEN_PLUS_EQUAL : TOKEN_PLUS);
+    case '?':
+      return makeToken(
+        match('?')
+          ? (match('=') ? TOKEN_NILISH_EQUAL : TOKEN_NILISH)
+          : TOKEN_QUESTION
+      );
+
     case '!': return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '<': return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>': return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);

@@ -53,9 +53,9 @@ static Chunk* currentChunk() {
 }
 
 /// Compile the given [source] text into bytecode instructions, storing them in
-/// the given [chunk].
+/// a function object.
 ///
-/// Returns whether compilation was successful.
+/// Returns a pointer to the compiled function object.
 ObjFunction* compile(const char* source) {
   initScanner(source);
 
@@ -719,9 +719,56 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
     setOp = OP_SET_GLOBAL;
   }
 
-  if (canAssign && nextMatches(TOKEN_EQUAL)) {
-    expression();
-    return emitBytes(setOp, (uint8_t)varOffset);
+  // Handle valid assignment operators
+  if (canAssign) {
+    switch (nextType()) {
+      case TOKEN_EQUAL:
+        advance();
+        expression();
+        return emitBytes(setOp, (uint8_t)varOffset);
+
+      case TOKEN_PLUS_EQUAL:
+        advance();
+        emitBytes(getOp, (uint8_t)varOffset);
+        expression();
+        emitByte(OP_ADD);
+        return emitBytes(setOp, (uint8_t)varOffset);
+
+      case TOKEN_MINUS_EQUAL:
+        advance();
+        emitBytes(getOp, (uint8_t)varOffset);
+        expression();
+        emitByte(OP_SUBTRACT);
+        return emitBytes(setOp, (uint8_t)varOffset);
+
+      case TOKEN_STAR_EQUAL:
+        advance();
+        emitBytes(getOp, (uint8_t)varOffset);
+        expression();
+        emitByte(OP_MULTIPLY);
+        return emitBytes(setOp, (uint8_t)varOffset);
+
+      case TOKEN_SLASH_EQUAL:
+        advance();
+        emitBytes(getOp, (uint8_t)varOffset);
+        expression();
+        emitByte(OP_DIVIDE);
+        return emitBytes(setOp, (uint8_t)varOffset);
+
+      case TOKEN_NILISH_EQUAL:
+        advance();
+        emitBytes(getOp, (uint8_t)varOffset);
+        const int end = emitJump(OP_JUMP_IF_NOT_NIL);
+        emitByte(OP_POP);
+        expr(PREC_OR);
+        emitBytes(setOp, (uint8_t)varOffset);
+
+        // Patch jump after set op so we're not wasting a cycle on setting a
+        // value that hasn't changed
+        return patchJump(end);
+
+      default: break;
+    }
   }
 
   emitBytes(getOp, (uint8_t)varOffset);
@@ -752,7 +799,7 @@ static ParseRule rules[] = {
   [TOKEN_DOT]           = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SEMICOLON]     = {NULL,       NULL,     PREC_NONE       },
 
-  // One/two character token rules
+  // Multiple-character token rules
   [TOKEN_MINUS]         = {unary,      binary,   PREC_TERM       },
   [TOKEN_PLUS]          = {NULL,       binary,   PREC_TERM       },
   [TOKEN_SLASH]         = {NULL,       binary,   PREC_FACTOR     },
@@ -766,6 +813,11 @@ static ParseRule rules[] = {
   [TOKEN_GREATER_EQUAL] = {NULL,       binary,   PREC_COMPARISON },
   [TOKEN_LESS]          = {NULL,       binary,   PREC_COMPARISON },
   [TOKEN_LESS_EQUAL]    = {NULL,       binary,   PREC_COMPARISON },
+  [TOKEN_PLUS_EQUAL]    = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_MINUS_EQUAL]   = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_STAR_EQUAL]    = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_SLASH_EQUAL]   = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_NILISH_EQUAL]  = {NULL,       NULL,     PREC_NONE       },
 
   [TOKEN_ARROW]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_NILISH]        = {NULL,       nilish,   PREC_OR         },

@@ -1,18 +1,3 @@
-{
-  var a = 1;
-  fun f() {
-    print a;
-  }
-  var b = 2;
-  fun g() {
-    print b;
-  }
-  var c = 3;
-  fun h() {
-    print c;
-  }
-
-  f();
-  g();
-  h();
+for (var i = 0; i <= 10; i += 1) {
+  print i;
 }
