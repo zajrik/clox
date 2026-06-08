@@ -33,8 +33,8 @@ static void initCompiler(Compiler* c, const FunctionType type) {
 
   if (type != TYPE_SCRIPT) {
     compiler->function->identifier = copyString(
-    parser.current.start,
-    parser.current.length
+      parser.current.start,
+      parser.current.length
     );
   }
 
@@ -87,8 +87,8 @@ static ObjFunction* endCompilation() {
   #ifdef DEBUG_PRINT_CODE
   if (!parser.hadError) {
     disassembleChunk(
-    currentChunk(),
-    fun->identifier != NULL ? fun->identifier->chars : "<script>"
+      currentChunk(),
+      fun->identifier != NULL ? fun->identifier->chars : "<script>"
     );
   } else {
     printf("errors occurred\n");

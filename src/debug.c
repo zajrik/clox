@@ -91,10 +91,10 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
         const int isLocal = chunk->instructions[newOffset++];
         const int upvalue = chunk->instructions[newOffset++];
         printf(
-        "%04d      |                     %s %d\n",
-        newOffset - 2,
-        isLocal ? "local" : "upvalue",
-        upvalue
+          "%04d      |                     %s %d\n",
+          newOffset - 2,
+          isLocal ? "local" : "upvalue",
+          upvalue
         );
       }
 
