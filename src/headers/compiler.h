@@ -141,7 +141,7 @@ static void returnStatement();
 static void whileStatement();
 static void forStatement();
 static void block();
-static void function(FunctionType type);
+static void function(FunctionType type, bool isExpr);
 
 static void expr(Precedence precedence);
 

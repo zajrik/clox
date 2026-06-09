@@ -157,7 +157,7 @@ void printObject(const Value value) {
 /// Print the given lox function value.
 void printFunction(const ObjFunction* function) {
   if (function->identifier == NULL) {
-    printf(function->type == TYPE_SCRIPT ? "<script>" : "<fun>");
+    printf(function->type == TYPE_SCRIPT ? "<script>" : "<anon fun>");
   } else {
     printf("<fun %s>", function->identifier->chars);
   }

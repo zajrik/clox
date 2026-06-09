@@ -31,7 +31,9 @@ static void initCompiler(Compiler* c, const FunctionType type) {
   // Set the given compiler as current compiler
   compiler = c;
 
-  if (type != TYPE_SCRIPT) {
+  const bool isAnonymous = memcmp(parser.current.start, "fun", parser.current.length) == 0;
+
+  if (type != TYPE_SCRIPT && !isAnonymous) {
     compiler->function->identifier = copyString(
       parser.current.start,
       parser.current.length
@@ -113,6 +115,10 @@ static void advance() {
   }
 }
 
+/// Switch-case wrapper to clean up branches that need an `advance()` call and
+/// a break statement.
+#define ADVANCE(stmt...) advance(), stmt; break
+
 /// Consume a token of the given [type] from scanned tokens.
 ///
 /// Emits an error [msg] if the token type is not consumed.
@@ -169,18 +175,19 @@ void pushScope() {
 /// End the current scope.
 void popScope() {
   compiler->scopeDepth--;
-  // uint8_t poppedLocals = 0;
 
+  // Close upvalues and pop stack values at the end of scope
   while (
     compiler->localCount > 0
     && compiler->locals[compiler->localCount - 1].depth > compiler->scopeDepth
   ) {
-    emitByte(compiler->locals[compiler->localCount - 1].isCaptured ? OP_CLOSE_UPVALUE : OP_POP);
+    emitByte(
+      compiler->locals[compiler->localCount - 1].isCaptured
+        ? OP_CLOSE_UPVALUE
+        : OP_POP
+    );
     compiler->localCount--;
-    // poppedLocals++;
   }
-
-  // if (poppedLocals > 0) emitBytes(OP_POP_N, poppedLocals);
 }
 
 /// Execute the given statement rule within a new scope.
@@ -198,12 +205,10 @@ void scope(const StmtFn rule) {
 ///
 /// declaration := varDecl | funDecl | statement ;
 static void declaration() {
-  if (nextMatches(TOKEN_FUN)) {
-    functionDeclaration();
-  } else if (nextMatches(TOKEN_VAR)) {
-    variableDeclaration();
-  } else {
-    statement();
+  switch (nextType()) {
+    case TOKEN_FUN: ADVANCE(functionDeclaration());
+    case TOKEN_VAR: ADVANCE(variableDeclaration());
+    default: statement();
   }
   if (parser.panicMode) synchronize();
 }
@@ -215,7 +220,7 @@ static void functionDeclaration() {
   // Mark function as defined so it can refer to itself.
   markDefined();
 
-  function(TYPE_FUNCTION);
+  function(TYPE_FUNCTION, false);
   defineVariable(identOffset);
 }
 
@@ -241,13 +246,13 @@ static void variableDeclaration() {
 ///              | block ;
 static void statement() {
   switch (nextType()) {
-    case TOKEN_PRINT: DO(advance(), printStatement());
-    case TOKEN_IF: DO(advance(), ifStatement());
-    case TOKEN_SWITCH: DO(advance(), switchStatement());
-    case TOKEN_RETURN: DO(advance(), returnStatement());
-    case TOKEN_WHILE: DO(advance(), whileStatement());
-    case TOKEN_FOR: DO(advance(), scope(forStatement));
-    case TOKEN_LEFT_BRACE: DO(advance(), scope(block));
+    case TOKEN_PRINT: ADVANCE(printStatement());
+    case TOKEN_IF: ADVANCE(ifStatement());
+    case TOKEN_SWITCH: ADVANCE(switchStatement());
+    case TOKEN_RETURN: ADVANCE(returnStatement());
+    case TOKEN_WHILE: ADVANCE(whileStatement());
+    case TOKEN_FOR: ADVANCE(scope(forStatement));
+    case TOKEN_LEFT_BRACE: ADVANCE(scope(block));
     default: expressionStatement();
   }
 }
@@ -456,8 +461,14 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
 }
 
-/// Compiles a function of the given [type] from scanned tokens.
-static void function(const FunctionType type) {
+/// Compiles a function statement or expression of the given [type] from scanned
+/// tokens.
+static void function(const FunctionType type, const bool isExpr) {
+  // If we're compiling a function expression, an identifier is optional but the
+  // "fun" keyword will be the current scanned token so we'll need to take in the
+  // identifier if we see one
+  if (isExpr && nextIs(TOKEN_IDENTIFIER)) advance();
+
   Compiler c;
   initCompiler(&c, type);
 
@@ -483,8 +494,14 @@ static void function(const FunctionType type) {
   }
 
   consume(TOKEN_RIGHT_PAREN, "Expected ')' after function parameters.");
-  consume(TOKEN_LEFT_BRACE, "Expected '{' before function body.");
-  block();
+
+  if (nextMatches(TOKEN_LEFT_BRACE)) {
+    block();
+  } else if (nextMatches(TOKEN_EQUAL)) {
+    expression();
+    emitByte(OP_RETURN);
+    if (!isExpr) consume(TOKEN_SEMICOLON, "Expected ';' after function body.");
+  }
 
   ObjFunction* function = endCompilation();
 
@@ -673,6 +690,11 @@ static void switchExpr(bool _) {
   patchJumps(&exit);
 }
 
+/// Compiles a function expression from scanned tokens.
+static void funExpr(bool _) {
+  function(TYPE_FUNCTION, true);
+}
+
 /// Compiles a keyword-literal expression, emitting the relevant opcode.
 static void literal(bool _) {
   switch (currentType()) {
@@ -835,7 +857,7 @@ static ParseRule rules[] = {
   [TOKEN_ELSE]          = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_FALSE]         = {literal,    NULL,     PREC_NONE       },
   [TOKEN_FOR]           = {NULL,       NULL,     PREC_NONE       },
-  [TOKEN_FUN]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_FUN]           = {funExpr,    NULL,     PREC_NONE       },
   [TOKEN_IF]            = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_NIL]           = {literal,    NULL,     PREC_NONE       },
   [TOKEN_OR]            = {NULL,       or,       PREC_OR         },
