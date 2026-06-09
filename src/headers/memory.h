@@ -34,4 +34,13 @@ void* reallocate(void* ptr, size_t oldSize, size_t newSize);
 void freeObject(Obj* object);
 void freeObjects();
 
+void collectGarbage();
+static void markRoots();
+static void traceReferences();
+static void sweep();
+void markValue(Value value);
+void markObject(Obj* obj);
+static void markArray(const ValueArray* array);
+static void visitObject(Obj* obj);
+
 #endif

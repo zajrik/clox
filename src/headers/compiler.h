@@ -199,4 +199,6 @@ static void errorAtNext(const char* msg);
 static void error(const char* msg);
 static void synchronize();
 
+void markCompilerRoots();
+
 #endif

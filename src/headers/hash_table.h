@@ -25,6 +25,9 @@ bool tableDelete(const Table* table, const ObjString* key);
 
 ObjString* tableFindString(const Table* table, const char* chars, int length, uint32_t hash);
 
+void markTable(const Table* table);
+void tableRemoveUnmarked(const Table* table);
+
 static Entry* findEntry(Entry* entries, int capacity, const ObjString* key);
 
 #endif

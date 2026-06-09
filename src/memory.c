@@ -1,9 +1,17 @@
 #include "headers/memory.h"
 
 #include "headers/common.h"
+#include "headers/compiler.h"
 #include "headers/object.h"
 #include "headers/value.h"
 #include "headers/vm.h"
+
+#ifdef DEBUG_LOG_GC
+#include <stdio.h>
+#include "headers/debug.h"
+#endif
+
+#define GC_HEAP_GROW_FACTOR 2
 
 /// Reallocates memory at address [ptr], allocating [newSize] bytes.
 ///
@@ -11,6 +19,20 @@
 ///
 /// Returns a pointer to the newly allocated block of memory.
 void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
+  vm.bytesAllocated += newSize - oldSize;
+
+  if (newSize > oldSize) {
+    #ifdef DEBUG_STRESS_GC
+    collectGarbage();
+    #endif
+  }
+
+  // #ifndef DEBUG_STRESS_GC
+  if (vm.bytesAllocated > vm.nextGC) {
+    collectGarbage();
+  }
+  // #endif
+
   if (newSize == 0) {
     free(ptr);
     return NULL;
@@ -23,6 +45,10 @@ void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
 
 /// Free memory used by the lox object at address [object].
 void freeObject(Obj* object) {
+  // #ifdef DEBUG_LOG_GC
+  printf("%p freed type %d\n", (void*)object, object->type);
+  // #endif
+
   switch (object->type) {
     case OBJ_STRING: {
       const ObjString* strObj = (ObjString*)object;
@@ -64,5 +90,175 @@ void freeObjects() {
     Obj* next = object->next;
     freeObject(object);
     object = next;
+  }
+
+  free(vm.gcStack);
+}
+
+/// Run the garbage collector.
+///
+/// The garbage collector will mark objects that are still in use and all unmarked
+/// objects will be freed.
+void collectGarbage() {
+  #ifdef DEBUG_LOG_GC
+  printf("-- gc begin\n");
+  const size_t before = vm.bytesAllocated;
+  #endif
+
+  markRoots();
+  traceReferences();
+  tableRemoveUnmarked(&vm.strings);
+  sweep();
+
+  vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
+
+  #ifdef DEBUG_LOG_GC
+  printf("-- gc end\n");
+  printf(
+    "    collected %zu bytes (from %zu to %zu), next at %zu\n",
+    before - vm.bytesAllocated,
+    before,
+    vm.bytesAllocated,
+    vm.nextGC
+  );
+  #endif
+}
+
+/// Mark reachable objects for the GC, starting at the roots of any structures
+/// that hold allocated object references.
+static void markRoots() {
+  // Mark stack values
+  for (const Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+    markValue(*slot);
+  }
+
+  // Mark call frame closures
+  for (int i = 0; i < vm.frameCount; i++) {
+    markObject((Obj*)vm.frames[i].closure);
+  }
+
+  // Mark open upvalues
+  for (
+    ObjUpvalue* upvalue = vm.openUpvalues;
+    upvalue != NULL;
+    upvalue = upvalue->next
+  ) {
+    markObject((Obj*)upvalue);
+  }
+
+  markTable(&vm.globals);
+  markCompilerRoots();
+}
+
+/// Trace through marked object references to mark any further reachable objects.
+static void traceReferences() {
+  while (vm.gcCount > 0) {
+    Obj* obj = vm.gcStack[--vm.gcCount];
+    visitObject(obj);
+  }
+}
+
+/// Free all objects that were not marked by the GC tracing pass.
+static void sweep() {
+  Obj* obj = NULL;
+  Obj* nextObj = vm.objects;
+
+  // Walk VM objects list
+  while (nextObj != NULL) {
+    // Skip over marked objects and unmark them
+    if (nextObj->isAlive) {
+      nextObj->isAlive = false;
+
+      obj = nextObj;
+      nextObj = nextObj->next;
+    }
+
+    // Free unmarked objects, removing them from the VM's linked list of objects
+    else {
+      Obj* unmarked = nextObj;
+      nextObj = nextObj->next;
+
+      if (obj != NULL) {
+        obj->next = nextObj;
+      } else {
+        vm.objects = nextObj;
+      }
+
+      freeObject(unmarked);
+    }
+  }
+}
+
+/// Mark the given [value] to allow it to live through a GC cycle.
+void markValue(const Value value) {
+  if (IS_OBJ(value)) markObject(AS_OBJ(value));
+}
+
+/// Mark the given object to allow it to live through a GC cycle.
+void markObject(Obj* obj) {
+  // Can't mark a null pointer or already-marked objects
+  if (obj == NULL || obj->isAlive) return;
+
+  #ifdef DEBUG_LOG_GC
+  printf("%p marked ", (void*)obj);
+  printObjectValue(OBJ_VAL(obj));
+  printf("\n");
+  #endif
+
+  obj->isAlive = true;
+
+  // Reallocate GC stack if necessary
+  if (vm.gcCapacity < vm.gcCount + 1) {
+    vm.gcCapacity = GROW_CAPACITY(vm.gcCapacity);
+
+    Obj** gcStack = realloc(vm.gcStack, sizeof(Obj*) * vm.gcCapacity);
+    if (gcStack == NULL) exit(1);
+
+    vm.gcStack = gcStack;
+  }
+
+  // Add object to GC stack
+  vm.gcStack[vm.gcCount++] = obj;
+}
+
+/// Mark all values in the given [ValueArray] to allow them to live through a
+/// GC cycle.
+static void markArray(const ValueArray* array) {
+  for (int i = 0; i < array->count; i++) {
+    markValue(array->values[i]);
+  }
+}
+
+/// Visit all object references reachable from the given object, marking them
+///
+static void visitObject(Obj* obj) {
+  #ifdef DEBUG_LOG_GC
+  printf("%p visit ", (void*)obj);
+  printValue(OBJ_VAL(obj));
+  printf("\n");
+  #endif
+
+  switch (obj->type) {
+    case OBJ_NATIVE:
+    case OBJ_STRING:
+      break;
+
+    case OBJ_CLOSURE: {
+      const ObjClosure* closure = (ObjClosure*)obj;
+      markObject((Obj*)closure->function);
+      for (int i = 0; i < closure->upvalueCount; i++) {
+        markObject((Obj*)closure->upvalues[i]);
+      }
+      break;
+    }
+
+    case OBJ_FUNCTION: {
+      const ObjFunction* function = (ObjFunction*)obj;
+      markObject((Obj*)function->identifier);
+      markArray(&function->chunk.constants);
+      break;
+    }
+
+    case OBJ_UPVALUE: DO(markValue(((ObjUpvalue*)obj)->closed));
   }
 }

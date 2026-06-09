@@ -3,6 +3,7 @@
 #include "headers/chunk.h"
 #include "headers/memory.h"
 #include "headers/object.h"
+#include "headers/vm.h"
 
 /// Initialize a chunk at address [chunk].
 void initChunk(Chunk* chunk) {
@@ -46,9 +47,14 @@ void writeChunk(Chunk* chunk, const uint8_t byte, const int line) {
 ///
 /// Returns the offset of the added constant value within the constants array.
 int addConstant(Chunk* chunk, const Value value) {
+  // Push value to stack to keep GC from reclaiming it. We'll pop it when it's
+  // safely tucked away in the constants array
+  push(value);
+
   // If value is not a string we can just add it to the chunk constants
   if (!IS_STRING(value)) {
     writeValueArray(&chunk->constants, value);
+    pop();
     return chunk->constants.count - 1;
   }
 
@@ -61,11 +67,13 @@ int addConstant(Chunk* chunk, const Value value) {
   if (tableHasKey(&chunk->strings, string)) {
     Value stringIndex;
     tableGet(&chunk->strings, string, &stringIndex);
+    pop();
     return AS_NUMBER(stringIndex);
   }
 
   writeValueArray(&chunk->constants, value);
   const int constantOffset = chunk->constants.count - 1;
   tableSet(&chunk->strings, string, NUMBER_VAL(constantOffset));
+  pop();
   return constantOffset;
 }

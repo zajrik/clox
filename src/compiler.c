@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "memory.h"
 #include "headers/chunk.h"
 #include "headers/common.h"
 #include "headers/object.h"
@@ -91,7 +92,9 @@ static ObjFunction* endCompilation() {
   if (!parser.hadError) {
     disassembleChunk(
       currentChunk(),
-      fun->identifier != NULL ? fun->identifier->chars : "<script>"
+      fun->identifier != NULL
+        ? fun->identifier->chars
+        : (fun->type == TYPE_SCRIPT ? "script" : "anon fun")
     );
   } else {
     printf("errors occurred\n");
@@ -1219,5 +1222,14 @@ static void synchronize() {
     }
 
     advance();
+  }
+}
+
+// Garbage Collection =========================================================
+
+/// Mark compiler roots for the GC.
+void markCompilerRoots() {
+  for (const Compiler* c = compiler; c != NULL; c = c->enclosing) {
+    markObject((Obj*)c->function);
   }
 }

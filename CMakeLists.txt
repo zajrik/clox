@@ -10,6 +10,7 @@ add_executable(clox
         src/headers/common.h
         src/headers/compiler.h
         src/headers/debug.h
+        src/headers/hash_table.h
         src/headers/memory.h
         src/headers/object.h
         src/headers/scanner.h
@@ -19,10 +20,10 @@ add_executable(clox
         src/clox.c
         src/compiler.c
         src/debug.c
+        src/hash_table.c
         src/memory.c
+        src/object.c
         src/scanner.c
         src/value.c
         src/vm.c
-        src/object.c
-        src/hash_table.c
-        src/headers/hash_table.h)
+)

@@ -15,13 +15,16 @@
 /// Allocates a new lox object of [size] and [type] and returns a pointer to it.
 static Obj* allocateObject(const size_t size, const ObjType type) {
   Obj* object = reallocate(NULL, 0, size);
-  // ReSharper disable once CppDFANullDereference
-  // SAFETY: reallocate will exit if it fails to allocate the memory
   object->type = type;
+  object->isAlive = false;
 
   // Link vm objects for cleaning up when vm closes.
   object->next = vm.objects;
   vm.objects = object;
+
+  #ifdef DEBUG_LOG_GC
+  printf("%p allocated %zu for %d\n", (void*)object, size, type);
+  #endif
 
   return object;
 }
@@ -46,8 +49,13 @@ static ObjString* allocateString(char* chars, const int length, const uint32_t h
   string->chars = chars;
   string->hash = hash;
 
+  // Push string to stack to keep the GC from reclaiming it before we intern it
+  push(OBJ_VAL(string));
+
   // Intern newly allocated string
   tableSet(&vm.strings, string, NIL_VAL);
+
+  pop();
 
   return string;
 }
@@ -141,7 +149,7 @@ ObjNative* newNative(const NativeFn function, const int arity) {
 }
 
 /// Print the given lox object value.
-void printObject(const Value value) {
+void printObjectValue(const Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
     case OBJ_FUNCTION: DO(printFunction(AS_FUNCTION(value)));

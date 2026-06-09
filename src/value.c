@@ -57,6 +57,6 @@ void printValue(const Value value) {
     case VAL_BOOL: DO(printf(AS_BOOL(value) ? "true" : "false"));
     case VAL_NIL: DO(printf("nil"));
     case VAL_NUMBER: DO(printf("%g", AS_NUMBER(value)));
-    case VAL_OBJ: DO(printObject(value));
+    case VAL_OBJ: DO(printObjectValue(value));
   }
 }

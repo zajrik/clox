@@ -16,6 +16,14 @@ Vm vm;
 void initVm() {
   resetStack();
   vm.objects = NULL;
+
+  vm.bytesAllocated = 0;
+  vm.nextGC = 1024 * 1024;
+
+  vm.gcCount = 0;
+  vm.gcCapacity = 0;
+  vm.gcStack = NULL;
+
   initTable(&vm.strings);
   initTable(&vm.globals);
 
@@ -43,7 +51,7 @@ static void resetStack() {
 ///
 /// Inserts the value into memory at the address pointed to by [vm.stackTop] and
 /// increments the stack top pointer to point to the next open slot on the stack.
-static void push(const Value value) {
+void push(const Value value) {
   *vm.stackTop++ = value;
 }
 
@@ -52,7 +60,7 @@ static void push(const Value value) {
 /// Decrements the stack top pointer and returns the value at the decremented
 /// address (points to the top value in the stack which can safely be overwritten
 /// when a value is next pushed).
-static Value pop() {
+Value pop() {
   return *--vm.stackTop;
 }
 
@@ -89,14 +97,16 @@ static Value peek(const int distance) {
 /// strings into the new block of memory and push the new string value to the
 /// stack.
 static void concatenate() {
-  const ObjString* b = AS_STRING(pop());
-  const ObjString* a = AS_STRING(pop());
+  const ObjString* b = AS_STRING(peek(0));
+  const ObjString* a = AS_STRING(peek(1));
   const int length = a->length + b->length;
   char* chars = ALLOCATE(char, length + 1);
 
   memcpy(chars, a->chars, a->length);
   memcpy(chars + a->length, b->chars, b->length);
   chars[length] = '\0';
+
+  pop(), pop();
 
   push(OBJ_VAL(takeString(chars, length)));
 }

@@ -174,3 +174,22 @@ ObjString* tableFindString(const Table* table, const char* chars, const int leng
     index = (index + 1) % table->capacity;
   }
 }
+
+/// Mark the objects in the given table for the GC.
+void markTable(const Table* table) {
+  for (int i = 0; i < table->capacity; i++) {
+    const Entry* entry = &table->entries[i];
+    markObject((Obj*)entry->key);
+    markValue(entry->value);
+  }
+}
+
+/// Remove objects that the GC has not marked as alive.
+void tableRemoveUnmarked(const Table* table) {
+  for (int i = 0; i < table->capacity; i++) {
+    const Entry* entry = &table->entries[i];
+    if (entry->key != NULL && !entry->key->object.isAlive) {
+      tableDelete(table, entry->key);
+    }
+  }
+}

@@ -54,6 +54,21 @@ typedef struct Vm {
 
   /// Linked list of allocated lox objects.
   Obj* objects;
+
+  /// Total bytes allocated by the VM.
+  size_t bytesAllocated;
+
+  /// Threshold of allocated bytes before the GC will run next.
+  size_t nextGC;
+
+  /// Current count of objects marked by the GC.
+  int gcCount;
+
+  /// Current capacity for objects marked by GC.
+  int gcCapacity;
+
+  /// Array of pointers to objects marked by the GC.
+  Obj** gcStack;
 } Vm;
 
 /// Result of interpreting a set of instructions.
@@ -69,8 +84,8 @@ void initVm();
 void freeVm();
 
 static void resetStack();
-static void push(Value value);
-static Value pop();
+void push(Value value);
+Value pop();
 
 static Value peek(int distance);
 static void concatenate();
