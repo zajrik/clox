@@ -47,6 +47,11 @@ static void resetStack() {
   vm.openUpvalues = NULL;
 }
 
+/// Peek at a value in the stack, offset by [distance] from the top of the stack.
+static Value peek(const int distance) {
+  return *(vm.stackTop - 1 - distance);
+}
+
 /// Push [value] to the top of the vm stack.
 ///
 /// Inserts the value into memory at the address pointed to by [vm.stackTop] and
@@ -86,29 +91,27 @@ static void closeUpvalues(const Value* last) {
   }
 }
 
-// void hoistN(const uint8_t n) {}
-
-/// Peek at a value in the stack, offset by [distance] from the top of the stack.
-static Value peek(const int distance) {
-  return *(vm.stackTop - 1 - distance);
+/// Pop the method closure object off the top of the stack, attach it to the class
+/// object below it on the stack.
+static void defineMethod(ObjString* identifier) {
+  const Value method = peek(0);
+  ObjClass* classObj = AS_CLASS(peek(1));
+  tableSet(&classObj->methods, identifier, method);
+  pop();
 }
 
-/// Pop two lox strings off of the stack, allocate a new string, copy the two
-/// strings into the new block of memory and push the new string value to the
-/// stack.
-static void concatenate() {
-  const ObjString* b = AS_STRING(peek(0));
-  const ObjString* a = AS_STRING(peek(1));
-  const int length = a->length + b->length;
-  char* chars = ALLOCATE(char, length + 1);
+static bool bindMethod(const ObjClass* classObj, const ObjString* identifier) {
+  Value method;
+  if (!tableGet(&classObj->methods, identifier, &method)) return false;
 
-  memcpy(chars, a->chars, a->length);
-  memcpy(chars + a->length, b->chars, b->length);
-  chars[length] = '\0';
+  const Value receiver = peek(0);
+  ObjMethod* boundMethod = newMethod(receiver, AS_CLOSURE(method));
 
-  popN(2);
+  // Pop receiver from the stack and replace it with the bound method
+  pop();
+  push(OBJ_VAL(boundMethod));
 
-  push(OBJ_VAL(takeString(chars, length)));
+  return true;
 }
 
 /// Attempt to call the given [callee] as a function using the top [argCount] values
@@ -123,6 +126,11 @@ static bool callValue(const Value callee, const int argCount) {
         ObjClass* classObj = AS_CLASS(callee);
         vm.stackTop[-1 - argCount] = OBJ_VAL(newInstance(classObj));
         return true;
+      }
+
+      case OBJ_METHOD: {
+        const ObjMethod* method = AS_METHOD(callee);
+        return callFun(method->closure, argCount);
       }
 
       case OBJ_CLOSURE: return callFun(AS_CLOSURE(callee), argCount);
@@ -203,6 +211,24 @@ static ObjUpvalue* captureUpvalue(Value* local) {
   }
 
   return createdUpvalue;
+}
+
+/// Pop two lox strings off of the stack, allocate a new string, copy the two
+/// strings into the new block of memory and push the new string value to the
+/// stack.
+static void concatenate() {
+  const ObjString* b = AS_STRING(peek(0));
+  const ObjString* a = AS_STRING(peek(1));
+  const int length = a->length + b->length;
+  char* chars = ALLOCATE(char, length + 1);
+
+  memcpy(chars, a->chars, a->length);
+  memcpy(chars + a->length, b->chars, b->length);
+  chars[length] = '\0';
+
+  popN(2);
+
+  push(OBJ_VAL(takeString(chars, length)));
 }
 
 /// Interpret the given lox source code text.
@@ -426,16 +452,22 @@ static InterpretResult run() {
         }
 
         const ObjInstance* instance = AS_INSTANCE(peek(0));
-        const ObjString* ident = READ_STRING();
+        const ObjString* identifier = READ_STRING();
 
+        // Get field value and push it to the stack
         Value value;
-        if (tableGet(&instance->fields, ident, &value)) {
+        if (tableGet(&instance->fields, identifier, &value)) {
           pop();
           push(value);
           break;
         }
 
+        // If we couldn't get a field, try it as a method. If a method is found
+        // by bindMethod it will be on the stack already and we can end this op
+        if (bindMethod(instance->classObj, identifier)) break;
+
         // Return nil if property doesn't exist.
+        pop();
         push(NIL_VAL);
         break;
       }
@@ -511,6 +543,10 @@ static InterpretResult run() {
       // Obtain class identifier string from operand (constants table offset),
       // wrap it in a class object and push it to the stack
       case OP_CLASS: DO(push(OBJ_VAL(newClass(READ_STRING()))));
+
+      // Define method on the class on the stack using the method name obtained
+      // from the operand.
+      case OP_METHOD: DO(defineMethod(READ_STRING()));
 
       // Return from the current call frame, pushing the result to the stack
       case OP_RETURN: {

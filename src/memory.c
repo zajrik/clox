@@ -68,14 +68,22 @@ void freeObject(Obj* object) {
     }
 
     case OBJ_CLASS: {
-      FREE(ObjClass, object);
+      ObjClass* classObj = (ObjClass*)object;
+      freeTable(&classObj->methods);
+      FREE(ObjClass, classObj);
       break;
     }
 
     case OBJ_INSTANCE: {
       ObjInstance* instance = (ObjInstance*)object;
       freeTable(&instance->fields);
-      FREE(ObjInstance, object);
+      FREE(ObjInstance, instance);
+      break;
+    }
+
+    case OBJ_METHOD: {
+      ObjMethod* method = (ObjMethod*)object;
+      FREE(ObjMethod, method);
       break;
     }
 
@@ -238,7 +246,7 @@ static void markArray(const ValueArray* array) {
 }
 
 /// Visit all object references reachable from the given object, marking them
-///
+/// as alive for the current GC cycle.
 static void visitObject(Obj* obj) {
   #ifdef DEBUG_LOG_GC
   printf("%p visit ", (void*)obj);
@@ -254,6 +262,7 @@ static void visitObject(Obj* obj) {
     case OBJ_CLASS: {
       const ObjClass* classObj = (ObjClass*)obj;
       markObject((Obj*)classObj->identifier);
+      markTable(&classObj->methods);
       break;
     }
 
@@ -261,6 +270,12 @@ static void visitObject(Obj* obj) {
       const ObjInstance* instance = (ObjInstance*)obj;
       markObject((Obj*)instance->classObj);
       markTable(&instance->fields);
+    }
+
+    case OBJ_METHOD: {
+      const ObjMethod* method = (ObjMethod*)obj;
+      markValue(method->receiver);
+      markObject((Obj*)method->closure);
     }
 
     case OBJ_CLOSURE: {

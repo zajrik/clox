@@ -131,6 +131,7 @@ static void scope(StmtFn rule);
 
 static void declaration();
 static void classDeclaration();
+static void methodDeclaration();
 static void functionDeclaration();
 static void variableDeclaration();
 static void statement();

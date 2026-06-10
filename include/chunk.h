@@ -75,7 +75,14 @@ typedef enum OpCode {
   OP_SET_UPVALUE,
   OP_GET_UPVALUE,
 
+  /// Pop the top value off of the stack, assign it to a field with the name obtained
+  /// from the operand byte (string constants table offset) on the receiver object
+  /// below the popped value on the stack.
   OP_SET_PROPERTY,
+
+  /// Pop the receiver object off of the top of the stack. Push the property with
+  /// the name obtained from the operand byte (string constants table offset)
+  /// found on the receiver to the top of the stack.
   OP_GET_PROPERTY,
 
   OP_JUMP_IF_FALSE,
@@ -98,6 +105,10 @@ typedef enum OpCode {
   /// Creates a class object at runtime. Must be followed by an operand specifying
   /// a constants table offset pointing to the class identifier string.
   OP_CLASS,
+
+  /// Assign the closure object on top of the stack as a method on the class object
+  /// below it on the stack, popping the method closure off of the stack.
+  OP_METHOD,
 
   /// Return a value (or nothing) from a function.
   OP_RETURN,

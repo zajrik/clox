@@ -84,14 +84,19 @@ void initVm();
 void freeVm();
 
 static void resetStack();
+static Value peek(int distance);
 void push(Value value);
 Value pop();
+void popN(uint8_t n);
+static void closeUpvalues(const Value* last);
+static void defineMethod(ObjString* identifier);
+static bool bindMethod(const ObjClass* classObj, const ObjString* identifier);
 
-static Value peek(int distance);
-static void concatenate();
 static bool callValue(Value callee, int argCount);
 static bool callFun(ObjClosure* closure, int argCount);
 static ObjUpvalue* captureUpvalue(Value* local);
+
+static void concatenate();
 
 InterpretResult interpret(const char* source);
 static InterpretResult run();

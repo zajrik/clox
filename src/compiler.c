@@ -219,12 +219,29 @@ static void declaration() {
 /// Compiles a class declaration from scanned tokens.
 static void classDeclaration() {
   const uint8_t identOffset = variableIdentifier("Expected class name.");
+  const Token identifier = parser.current;
 
   emitBytes(OP_CLASS, identOffset);
   defineVariable(identOffset);
 
+  // Load the class object onto the stack for OP_METHOD instructions
+  variableGetSet(identifier, false);
+
+  // Compile method declarations in class body
   consume(TOKEN_LEFT_BRACE, "Expected '{' before class body.");
+  while (!nextIs(TOKEN_RIGHT_BRACE) && !nextIs(TOKEN_EOF)) {
+    methodDeclaration();
+  }
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
+
+  // Pop the class object from the stack
+  emitByte(OP_POP);
+}
+
+static void methodDeclaration() {
+  const uint8_t identOffset = variableIdentifier("Expected method name.");
+  function(TYPE_METHOD, false);
+  emitBytes(OP_METHOD, identOffset);
 }
 
 /// Compiles a function declaration from scanned tokens.

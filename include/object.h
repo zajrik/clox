@@ -10,6 +10,7 @@
 
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 #define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
+#define IS_METHOD(value) isObjType(value, OBJ_METHOD)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
@@ -17,6 +18,7 @@
 
 #define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
+#define AS_METHOD(value) ((ObjMethod*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 
@@ -30,6 +32,7 @@
 typedef enum ObjType {
   OBJ_CLASS,
   OBJ_INSTANCE,
+  OBJ_METHOD,
   OBJ_FUNCTION,
   OBJ_CLOSURE,
   OBJ_NATIVE,
@@ -124,7 +127,21 @@ typedef struct ObjClass {
 
   /// The identifier string for this class.
   ObjString* identifier;
+
+  /// Hash-table of methods instances of this class will have.
+  Table methods;
 } ObjClass;
+
+/// Represents a method bound to an instance of a class.
+typedef struct ObjMethod {
+  Obj object;
+
+  /// The class instance on which the method may be called.
+  Value receiver;
+
+  /// The method closure itself.
+  ObjClosure* closure;
+} ObjMethod;
 
 /// Represents an instance of a lox class at runtime.
 typedef struct ObjInstance {
@@ -164,6 +181,7 @@ ObjString* takeString(char* chars, int length);
 
 ObjClass* newClass(ObjString* identifier);
 ObjInstance* newInstance(ObjClass* classObj);
+ObjMethod* newMethod(Value receiver, ObjClosure* closure);
 ObjFunction* newFunction(FunctionType type);
 ObjClosure* newClosure(ObjFunction* function);
 ObjUpvalue* newUpvalue(Value* slot);
