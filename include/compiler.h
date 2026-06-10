@@ -189,7 +189,7 @@ static uint8_t makeIdentConstant(const Token* token);
 static void emitByte(uint8_t byte);
 static void emitBytes(uint8_t a, uint8_t b);
 static void emitConstant(Value value);
-static void emitNilReturn();
+static void emitDefaultReturn();
 
 static int emitJump(OpCode opcode);
 static void patchJump(int offset);

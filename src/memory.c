@@ -41,9 +41,9 @@ void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
 
 /// Free memory used by the lox object at address [object].
 void freeObject(Obj* object) {
-  // #ifdef DEBUG_LOG_GC
+  #ifdef DEBUG_LOG_GC
   printf("%p freed type %d\n", (void*)object, object->type);
-  // #endif
+  #endif
 
   switch (object->type) {
     case OBJ_STRING: {
@@ -163,6 +163,7 @@ static void markRoots() {
   }
 
   markTable(&vm.globals);
+  markObject((Obj*)vm.initString);
   markCompilerRoots();
 }
 

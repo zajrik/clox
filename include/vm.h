@@ -37,14 +37,17 @@ typedef struct Vm {
   /// Pointer to the top of the stack, where the next item will be inserted.
   Value* stackTop;
 
+  /// Hash-table of all global-scoped program variables.
+  Table globals;
+
   /// Hash-table of interned strings, used to ensure any allocated string exists
   /// only once. When a string is produced, we'll check here for it first and
   /// return a pointer to the existing interned string if it exists before allocating
   /// a new string.
   Table strings;
 
-  /// Hash-table of all global-scoped program variables.
-  Table globals;
+  /// A reference to the constant string "init" for class initializer lookups.
+  ObjString* initString;
 
   /// Pointer to the head of a linked list of open upvalues to be closed over and
   /// hoisted to the heap when they go out of scope.

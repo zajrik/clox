@@ -24,16 +24,20 @@ void initVm() {
   vm.gcCapacity = 0;
   vm.gcStack = NULL;
 
-  initTable(&vm.strings);
   initTable(&vm.globals);
+  initTable(&vm.strings);
+
+  vm.initString = NULL;
+  vm.initString = copyString("init", 4);
 
   defineNative("clock", clockNative, 0);
 }
 
 /// Free resources used by the virtual machine.
 void freeVm() {
-  freeTable(&vm.strings);
   freeTable(&vm.globals);
+  freeTable(&vm.strings);
+  vm.initString = NULL;
   freeObjects();
 }
 
@@ -124,7 +128,16 @@ static bool callValue(const Value callee, const int argCount) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_CLASS: {
         ObjClass* classObj = AS_CLASS(callee);
+
+        // Replace class object on stack with instance
         vm.stackTop[-1 - argCount] = OBJ_VAL(newInstance(classObj));
+
+        // Find initializer, calling it if it exists
+        Value initializer;
+        if (tableGet(&classObj->methods, vm.initString, &initializer)) {
+          return callFun(AS_CLOSURE(initializer), argCount);
+        }
+
         return true;
       }
 
@@ -133,7 +146,7 @@ static bool callValue(const Value callee, const int argCount) {
 
         // Bind method receiver to frame stack slot 0 (replacing the method itself)
         vm.stackTop[-1 - argCount] = method->receiver;
-        
+
         return callFun(method->closure, argCount);
       }
 

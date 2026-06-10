@@ -49,7 +49,7 @@ static void initCompiler(Compiler* c, const FunctionType type) {
   local->depth = 0;
   local->isCaptured = false;
   local->identifier.type = TOKEN_IDENTIFIER;
-  if (type == TYPE_METHOD) {
+  if (type == TYPE_METHOD || type == TYPE_INITIALIZER) {
     local->identifier.start = "this";
     local->identifier.length = 4;
   } else {
@@ -92,7 +92,7 @@ ObjFunction* compile(const char* source) {
 static ObjFunction* endCompilation() {
   // Emit nil return to allow functions to return nil by default if they do not
   // specify a return of their own
-  emitNilReturn();
+  emitDefaultReturn();
 
   ObjFunction* fun = compiler->function;
 
@@ -257,9 +257,13 @@ static void classDeclaration() {
   currentClass = currentClass->enclosing;
 }
 
+/// Compiles a method declaration from scanned tokens.
 static void methodDeclaration() {
   const uint8_t identOffset = variableIdentifier("Expected method name.");
-  function(TYPE_METHOD, false);
+  const bool isInitializer = parser.current.length == 4
+    && memcmp(parser.current.start, "init", 4) == 0;
+
+  function(isInitializer ? TYPE_INITIALIZER : TYPE_METHOD, false);
   emitBytes(OP_METHOD, identOffset);
 }
 
@@ -419,8 +423,13 @@ static void returnStatement() {
   }
 
   if (nextMatches(TOKEN_SEMICOLON)) {
-    emitNilReturn();
+    emitDefaultReturn();
   } else {
+    if (compiler->type == TYPE_INITIALIZER) {
+      error("Can't return value from class initializer.");
+      return emitDefaultReturn();
+    }
+
     expression();
     consume(TOKEN_SEMICOLON, "Expected ';' after return value.");
     emitByte(OP_RETURN);
@@ -1168,8 +1177,15 @@ static void emitConstant(const Value value) {
   emitBytes(OP_CONSTANT, makeConstant(value));
 }
 
-/// Write [OP_NIL], [OP_RETURN] to the chunk currently being compiled.
-static void emitNilReturn() {
+/// Write default return instructions to the chunk currently being compiled.
+static void emitDefaultReturn() {
+  // If we're compiling an initializer, put the instance on the stack to return
+  if (compiler->type == TYPE_INITIALIZER) {
+    emitBytes(OP_GET_LOCAL, 0);
+    return emitByte(OP_RETURN);
+  }
+
+  // Otherwise emit a nil return
   emitBytes(OP_NIL, OP_RETURN);
 }
 
