@@ -1,9 +1,9 @@
 ﻿#include <string.h>
 
 #include "compiler.h"
-#include "memory.h"
 #include "chunk.h"
 #include "common.h"
+#include "memory.h"
 #include "object.h"
 #include "scanner.h"
 
@@ -205,14 +205,26 @@ void scope(const StmtFn rule) {
 
 /// Compiles a declaration statement from scanned tokens.
 ///
-/// declaration := varDecl | funDecl | statement ;
+/// declaration := varDecl | funDecl | classDecl | statement ;
 static void declaration() {
   switch (nextType()) {
+    case TOKEN_CLASS: ADVANCE(classDeclaration());
     case TOKEN_FUN: ADVANCE(functionDeclaration());
     case TOKEN_VAR: ADVANCE(variableDeclaration());
     default: statement();
   }
   if (parser.panicMode) synchronize();
+}
+
+/// Compiles a class declaration from scanned tokens.
+static void classDeclaration() {
+  const uint8_t identOffset = variableIdentifier("Expected class name.");
+
+  emitBytes(OP_CLASS, identOffset);
+  defineVariable(identOffset);
+
+  consume(TOKEN_LEFT_BRACE, "Expected '{' before class body.");
+  consume(TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
 }
 
 /// Compiles a function declaration from scanned tokens.
@@ -897,7 +909,7 @@ static uint8_t variableIdentifier(const char* expect) {
   // by their runtime-constant identifier strings loaded into the VM before the
   // lox bytecode is executed
   if (compiler->scopeDepth > 0) {
-    declareLocal();
+    declareVariable();
     return 0;
   }
 
@@ -909,7 +921,7 @@ static uint8_t variableIdentifier(const char* expect) {
 ///
 /// Does nothing if we're currently in the global scope. Global variables are declared
 /// and defined separately from local variables.
-static void declareLocal() {
+static void declareVariable() {
   if (compiler->scopeDepth == 0) return;
 
   const Token* identifier = &parser.current;

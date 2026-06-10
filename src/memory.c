@@ -1,14 +1,13 @@
+#ifdef DEBUG_LOG_GC
+#include <stdio.h>
+#endif
+
 #include "memory.h"
 #include "common.h"
 #include "compiler.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"
-
-#ifdef DEBUG_LOG_GC
-#include <stdio.h>
-#include "debug.h"
-#endif
 
 #define GC_HEAP_GROW_FACTOR 2
 
@@ -20,17 +19,15 @@
 void* reallocate(void* ptr, const size_t oldSize, const size_t newSize) {
   vm.bytesAllocated += newSize - oldSize;
 
+  #ifdef DEBUG_STRESS_GC
   if (newSize > oldSize) {
-    #ifdef DEBUG_STRESS_GC
     collectGarbage();
-    #endif
   }
+  #endif
 
-  // #ifndef DEBUG_STRESS_GC
   if (vm.bytesAllocated > vm.nextGC) {
     collectGarbage();
   }
-  // #endif
 
   if (newSize == 0) {
     free(ptr);
@@ -67,6 +64,18 @@ void freeObject(Obj* object) {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
       FREE(ObjClosure, closure);
+      break;
+    }
+
+    case OBJ_CLASS: {
+      FREE(ObjClass, object);
+      break;
+    }
+
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = (ObjInstance*)object;
+      freeTable(&instance->fields);
+      FREE(ObjInstance, object);
       break;
     }
 
@@ -241,6 +250,18 @@ static void visitObject(Obj* obj) {
     case OBJ_NATIVE:
     case OBJ_STRING:
       break;
+
+    case OBJ_CLASS: {
+      const ObjClass* classObj = (ObjClass*)obj;
+      markObject((Obj*)classObj->identifier);
+      break;
+    }
+
+    case OBJ_INSTANCE: {
+      const ObjInstance* instance = (ObjInstance*)obj;
+      markObject((Obj*)instance->classObj);
+      markTable(&instance->fields);
+    }
 
     case OBJ_CLOSURE: {
       const ObjClosure* closure = (ObjClosure*)obj;

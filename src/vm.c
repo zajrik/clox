@@ -119,7 +119,14 @@ static void concatenate() {
 static bool callValue(const Value callee, const int argCount) {
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
+      case OBJ_CLASS: {
+        ObjClass* classObj = AS_CLASS(callee);
+        vm.stackTop[-1 - argCount] = OBJ_VAL(newInstance(classObj));
+        return true;
+      }
+
       case OBJ_CLOSURE: return callFun(AS_CLOSURE(callee), argCount);
+        
       case OBJ_NATIVE: {
         const ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
 
@@ -456,6 +463,10 @@ static InterpretResult run() {
         }
         break;
       }
+
+      // Obtain class identifier string from operand (constants table offset),
+      // wrap it in a class object and push it to the stack
+      case OP_CLASS: DO(push(OBJ_VAL(newClass(READ_STRING()))));
 
       // Return from the current call frame, pushing the result to the stack
       case OP_RETURN: {

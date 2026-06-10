@@ -92,6 +92,10 @@ typedef enum OpCode {
   /// constants table offset pointing to a function value.
   OP_CLOSURE,
 
+  /// Creates a class object at runtime. Must be followed by an operand specifying
+  /// a constants table offset pointing to the class identifier string.
+  OP_CLASS,
+
   /// Return a value (or nothing) from a function.
   OP_RETURN,
 } OpCode;

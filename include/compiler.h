@@ -130,6 +130,7 @@ static void popScope();
 static void scope(StmtFn rule);
 
 static void declaration();
+static void classDeclaration();
 static void functionDeclaration();
 static void variableDeclaration();
 static void statement();
@@ -163,8 +164,8 @@ static void call(bool);
 static ParseRule* getRule(TokenType type);
 
 static uint8_t variableIdentifier(const char* expect);
+static void declareVariable();
 static void defineVariable(uint8_t identConstOffset);
-static void declareLocal();
 static int resolveLocal(const Compiler* c, const Token* identifier);
 static void addLocal(Token identifier);
 static void markDefined();

@@ -7,3 +7,6 @@ var z = 123;
     print foo(5, fun(c, d) = c * d * z + y, 13);
 }
 
+class Brioche {}
+print Brioche;
+print Brioche();

@@ -102,6 +102,21 @@ ObjString* takeString(char* chars, const int length) {
   return allocateString(chars, length, hash);
 }
 
+/// Allocates a new [ObjClass] and returns a pointer to it.
+ObjClass* newClass(ObjString* identifier) {
+  ObjClass* classObj = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+  classObj->identifier = identifier;
+  return classObj;
+}
+
+/// Allocates a new [ObjInstance] and returns a pointer to it.
+ObjInstance* newInstance(ObjClass* classObj) {
+  ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+  instance->classObj = classObj;
+  initTable(&instance->fields);
+  return instance;
+}
+
 /// Allocates a new [ObjFunction] and returns a pointer to it.
 ObjFunction* newFunction(const FunctionType type) {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
@@ -154,6 +169,10 @@ void printObjectValue(const Value value) {
     case OBJ_STRING: DO(printf("%s", AS_CSTRING(value)));
     case OBJ_FUNCTION: DO(printFunction(AS_FUNCTION(value)));
     case OBJ_CLOSURE: DO(printFunction(AS_CLOSURE(value)->function));
+    case OBJ_CLASS: DO(printf("%s", AS_CLASS(value)->identifier->chars));
+    case OBJ_INSTANCE: DO(
+        printf("Instance of %s", AS_INSTANCE(value)->classObj->identifier->chars)
+      );
     case OBJ_NATIVE: DO(printf("<native fun>"));
 
     // Upvalues are not exposed to the runtime so this is just to keep the

@@ -3,16 +3,23 @@
 
 #include "chunk.h"
 #include "common.h"
+#include "hash_table.h"
 #include "value.h"
 
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
+
+#define IS_CLASS(value) isObjType(value, OBJ_CLASS)
+#define IS_INSTANCE(value) isObjType(value, OBJ_INSTANCE)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 
+#define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
+#define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
+
 #define AS_NATIVE_FUN(value) (((ObjNative*)AS_OBJ(value))->function)
 #define AS_NATIVE_OBJ(value) ((ObjNative*)AS_OBJ(value))
 
@@ -21,6 +28,8 @@
 
 /// Represents the type of a heap-allocated lox object.
 typedef enum ObjType {
+  OBJ_CLASS,
+  OBJ_INSTANCE,
   OBJ_FUNCTION,
   OBJ_CLOSURE,
   OBJ_NATIVE,
@@ -28,6 +37,7 @@ typedef enum ObjType {
   OBJ_STRING,
 } ObjType;
 
+/// Represents the type of a function.
 typedef enum FunctionType {
   TYPE_FUNCTION,
   TYPE_SCRIPT,
@@ -107,6 +117,25 @@ typedef struct ObjUpvalue {
   Value closed;
 } ObjUpvalue;
 
+/// Represents a lox class object.
+typedef struct ObjClass {
+  Obj object;
+
+  /// The identifier string for this class.
+  ObjString* identifier;
+} ObjClass;
+
+/// Represents an instance of a lox class at runtime.
+typedef struct ObjInstance {
+  Obj object;
+
+  /// The class this object is an instance of.
+  ObjClass* classObj;
+
+  /// The fields of this class instance.
+  Table fields;
+} ObjInstance;
+
 /// Represents a pointer to a native function callable from lox code.
 typedef Value (*NativeFn)(int, Value*);
 
@@ -132,6 +161,8 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash);
 ObjString* copyString(const char* chars, int length);
 ObjString* takeString(char* chars, int length);
 
+ObjClass* newClass(ObjString* identifier);
+ObjInstance* newInstance(ObjClass* classObj);
 ObjFunction* newFunction(FunctionType type);
 ObjClosure* newClosure(ObjFunction* function);
 ObjUpvalue* newUpvalue(Value* slot);
