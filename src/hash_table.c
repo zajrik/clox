@@ -1,10 +1,10 @@
 #include <string.h>
 
-#include "headers/hash_table.h"
-#include "headers/common.h"
-#include "headers/memory.h"
-#include "headers/object.h"
-#include "headers/value.h"
+#include "hash_table.h"
+#include "common.h"
+#include "memory.h"
+#include "object.h"
+#include "value.h"
 
 #define TABLE_MAX_LOAD 0.75
 

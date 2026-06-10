@@ -1,8 +1,8 @@
 ﻿#include <stdbool.h>
 #include <string.h>
 
-#include "headers/scanner.h"
-#include "headers/common.h"
+#include "scanner.h"
+#include "common.h"
 
 /// Global token scanner instance.
 Scanner scanner;

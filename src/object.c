@@ -1,9 +1,9 @@
 #include <string.h>
 
-#include "headers/object.h"
-#include "headers/memory.h"
-#include "headers/value.h"
-#include "headers/vm.h"
+#include "object.h"
+#include "memory.h"
+#include "value.h"
+#include "vm.h"
 
 /// Allocate a block of memory for a lox object sized for the given [type] and
 /// returns a pointer to it.

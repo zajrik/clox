@@ -3,19 +3,19 @@ project(clox C)
 
 set(CMAKE_C_STANDARD 11)
 
-include_directories(src src/headers)
+include_directories(src include)
 
 add_executable(clox
-        src/headers/chunk.h
-        src/headers/common.h
-        src/headers/compiler.h
-        src/headers/debug.h
-        src/headers/hash_table.h
-        src/headers/memory.h
-        src/headers/object.h
-        src/headers/scanner.h
-        src/headers/value.h
-        src/headers/vm.h
+        include/chunk.h
+        include/common.h
+        include/compiler.h
+        include/debug.h
+        include/hash_table.h
+        include/memory.h
+        include/object.h
+        include/scanner.h
+        include/value.h
+        include/vm.h
         src/chunk.c
         src/clox.c
         src/compiler.c

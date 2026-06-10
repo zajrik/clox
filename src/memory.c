@@ -1,14 +1,14 @@
-#include "headers/memory.h"
+#include "memory.h"
 
-#include "headers/common.h"
-#include "headers/compiler.h"
-#include "headers/object.h"
-#include "headers/value.h"
-#include "headers/vm.h"
+#include "common.h"
+#include "compiler.h"
+#include "object.h"
+#include "value.h"
+#include "vm.h"
 
 #ifdef DEBUG_LOG_GC
 #include <stdio.h>
-#include "headers/debug.h"
+#include "debug.h"
 #endif
 
 #define GC_HEAP_GROW_FACTOR 2

@@ -1,9 +1,9 @@
 #include <stdlib.h>
 
-#include "headers/chunk.h"
-#include "headers/memory.h"
-#include "headers/object.h"
-#include "headers/vm.h"
+#include "chunk.h"
+#include "memory.h"
+#include "object.h"
+#include "vm.h"
 
 /// Initialize a chunk at address [chunk].
 void initChunk(Chunk* chunk) {

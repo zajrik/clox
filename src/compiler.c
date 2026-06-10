@@ -1,15 +1,15 @@
-﻿#include "headers/compiler.h"
+﻿#include "compiler.h"
 
 #include <string.h>
 
 #include "memory.h"
-#include "headers/chunk.h"
-#include "headers/common.h"
-#include "headers/object.h"
-#include "headers/scanner.h"
+#include "chunk.h"
+#include "common.h"
+#include "object.h"
+#include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
-#include "headers/debug.h"
+#include "debug.h"
 #endif
 
 /// Global parser instance.

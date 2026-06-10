@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "headers/chunk.h"
-#include "headers/vm.h"
+#include "chunk.h"
+#include "vm.h"
 
 static void repl() {
   char line[1024];

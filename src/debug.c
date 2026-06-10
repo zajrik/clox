@@ -1,9 +1,9 @@
 #include <stdio.h>
 
-#include "headers/debug.h"
+#include "debug.h"
 
 #include "object.h"
-#include "headers/value.h"
+#include "value.h"
 
 /// Print the contents (instructions, values, etc.) of the chunk at address [chunk].
 void disassembleChunk(const Chunk* chunk, const char* name) {

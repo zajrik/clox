@@ -1,8 +1,8 @@
 #include <stdio.h>
 
-#include "headers/value.h"
-#include "headers/memory.h"
-#include "headers/object.h"
+#include "value.h"
+#include "memory.h"
+#include "object.h"
 
 /// Initialize a [ValueArray] at address [array].
 void initValueArray(ValueArray* array) {
