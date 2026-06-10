@@ -1,7 +1,6 @@
-﻿#include "compiler.h"
+﻿#include <string.h>
 
-#include <string.h>
-
+#include "compiler.h"
 #include "memory.h"
 #include "chunk.h"
 #include "common.h"

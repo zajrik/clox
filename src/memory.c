@@ -1,5 +1,4 @@
 #include "memory.h"
-
 #include "common.h"
 #include "compiler.h"
 #include "object.h"

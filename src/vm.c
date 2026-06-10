@@ -30,7 +30,7 @@ void initVm() {
   defineNative("clock", clockNative, 0);
 }
 
-/// Free resources used by the virtual machine. (eventually)
+/// Free resources used by the virtual machine.
 void freeVm() {
   freeTable(&vm.strings);
   freeTable(&vm.globals);
@@ -106,7 +106,7 @@ static void concatenate() {
   memcpy(chars + a->length, b->chars, b->length);
   chars[length] = '\0';
 
-  pop(), pop();
+  popN(2);
 
   push(OBJ_VAL(takeString(chars, length)));
 }
