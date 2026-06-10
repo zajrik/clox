@@ -73,6 +73,14 @@ struct Compiler {
   int scopeDepth;
 };
 
+typedef struct ClassCompiler ClassCompiler;
+
+/// Tracks compilation of nested classes.
+struct ClassCompiler {
+  /// Pointer to the enclosing [ClassCompiler].
+  ClassCompiler* enclosing;
+};
+
 /// Indicates the level of precedence with which to parse and compile an expression.
 ///
 /// Enum member order is significant here and reflects the actual grammar rule

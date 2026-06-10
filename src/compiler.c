@@ -14,8 +14,12 @@
 /// Global parser instance.
 Parser parser;
 
-/// Pointer to the current compiler
+/// Pointer to the current compiler.
 Compiler* compiler = NULL;
+
+/// Pointer to the current class compiler for tracking when we're inside of
+/// method bodies.
+ClassCompiler* currentClass = NULL;
 
 /// Initialize the given [compiler] instance.
 static void initCompiler(Compiler* c, const FunctionType type) {
@@ -229,6 +233,14 @@ static void classDeclaration() {
   emitBytes(OP_CLASS, identOffset);
   defineVariable(identOffset);
 
+  ClassCompiler classCompiler;
+  classCompiler.enclosing = currentClass;
+
+  // SAFETY: This value lives on the C stack and will be discarded at the end
+  // of this function when currentClass is restored to the enclosing compiler
+  // ReSharper disable once CppDFALocalValueEscapesFunction
+  currentClass = &classCompiler;
+
   // Load the class object onto the stack for OP_METHOD instructions
   variableGetSet(identifier, false);
 
@@ -241,6 +253,8 @@ static void classDeclaration() {
 
   // Pop the class object from the stack
   emitByte(OP_POP);
+
+  currentClass = currentClass->enclosing;
 }
 
 static void methodDeclaration() {
@@ -834,6 +848,11 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
 
 /// Compiles a `this` expression.
 static void thisExpr(bool _) {
+  if (currentClass == NULL) {
+    error("Can't use 'this' outside of a class body.");
+    return;
+  }
+
   // The `this` token will be the current token and can just be compiled as a
   // variable with the name "this". We set aside local slot 0 in each call frame
   // for the frame's root function which will instead be used for `this` in methods
