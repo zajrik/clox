@@ -130,6 +130,10 @@ static bool callValue(const Value callee, const int argCount) {
 
       case OBJ_METHOD: {
         const ObjMethod* method = AS_METHOD(callee);
+
+        // Bind method receiver to frame stack slot 0 (replacing the method itself)
+        vm.stackTop[-1 - argCount] = method->receiver;
+        
         return callFun(method->closure, argCount);
       }
 

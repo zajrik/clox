@@ -40,13 +40,18 @@ static void initCompiler(Compiler* c, const FunctionType type) {
     );
   }
 
-  // Reserve local slot 0 for root function
+  // Reserve local slot 0 for root function, or for `this` in methods
   Local* local = &compiler->locals[compiler->localCount++];
   local->depth = 0;
-  local->identifier.type = TOKEN_IDENTIFIER;
-  local->identifier.start = "";
-  local->identifier.length = 0;
   local->isCaptured = false;
+  local->identifier.type = TOKEN_IDENTIFIER;
+  if (type == TYPE_METHOD) {
+    local->identifier.start = "this";
+    local->identifier.length = 4;
+  } else {
+    local->identifier.start = "";
+    local->identifier.length = 0;
+  }
 }
 
 /// Returns a pointer to the currently compiling chunk.
@@ -827,6 +832,14 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
   emitBytes(getOp, (uint8_t)varOffset);
 }
 
+/// Compiles a `this` expression.
+static void thisExpr(bool _) {
+  // The `this` token will be the current token and can just be compiled as a
+  // variable with the name "this". We set aside local slot 0 in each call frame
+  // for the frame's root function which will instead be used for `this` in methods
+  variable(false);
+}
+
 /// Compiles a grouping expression, emitting bytecode for the grouped expression.
 static void grouping(bool _) {
   expression();
@@ -909,7 +922,7 @@ static ParseRule rules[] = {
   [TOKEN_RETURN]        = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SUPER]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SWITCH]        = {switchExpr, NULL,     PREC_NONE       },
-  [TOKEN_THIS]          = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_THIS]          = {thisExpr,   NULL,     PREC_NONE       },
   [TOKEN_TRUE]          = {literal,    NULL,     PREC_NONE       },
   [TOKEN_VAR]           = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_WHILE]         = {NULL,       NULL,     PREC_NONE       },
