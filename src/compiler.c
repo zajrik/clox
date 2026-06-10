@@ -645,7 +645,7 @@ static void binary(bool _) {
 ///
 /// The left-hand operand of the `and` expression has already been compiled to
 /// the chunk at the point this will be called.
-static void and(bool _) {
+static void andExpr(bool _) {
   // The left-hand operand will be on the stack already for this jump op
   const int end = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
@@ -657,7 +657,7 @@ static void and(bool _) {
 ///
 /// The left-hand operand of the `or` expression has already been compiled to
 /// the chunk at the point this will be called.
-static void or(bool _) {
+static void orExpr(bool _) {
   // The left-hand operand will be on the stack already for this jump op
   const int end = emitJump(OP_JUMP_IF_TRUE);
   emitByte(OP_POP);
@@ -853,7 +853,7 @@ static void call(bool _) {
 }
 
 /// Compiles an object field get/set expression.
-static void dot(bool canAssign) {
+static void dot(const bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
   const uint8_t identOffset = makeIdentConstant(&parser.current);
 
@@ -907,7 +907,7 @@ static ParseRule rules[] = {
   [TOKEN_NUMBER]        = {number,     NULL,     PREC_NONE       },
 
   // Keyword token rules
-  [TOKEN_AND]           = {NULL,       and,      PREC_AND        },
+  [TOKEN_AND]           = {NULL,       andExpr,  PREC_AND        },
   [TOKEN_CLASS]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_CASE]          = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_DEFAULT]       = {NULL,       NULL,     PREC_NONE       },
@@ -917,7 +917,7 @@ static ParseRule rules[] = {
   [TOKEN_FUN]           = {funExpr,    NULL,     PREC_NONE       },
   [TOKEN_IF]            = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_NIL]           = {literal,    NULL,     PREC_NONE       },
-  [TOKEN_OR]            = {NULL,       or,       PREC_OR         },
+  [TOKEN_OR]            = {NULL,       orExpr,   PREC_OR         },
   [TOKEN_PRINT]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_RETURN]        = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_SUPER]         = {NULL,       NULL,     PREC_NONE       },
