@@ -138,6 +138,12 @@ static bool callValue(const Value callee, const int argCount) {
           return callFun(AS_CLOSURE(initializer), argCount);
         }
 
+        // If we didn't find an initializer, don't allow arguments
+        if (argCount != 0) {
+          runtimeError("Expected 0 arguments but got %d.", argCount);
+          return false;
+        }
+
         return true;
       }
 
@@ -194,6 +200,48 @@ static bool callFun(ObjClosure* closure, const int argCount) {
   frame->slots = vm.stackTop - 1 - argCount;
 
   return true;
+}
+
+/// Invoke a method with the given [identifier] on the receiver found on the stack
+/// below [argCount] arguments.
+static bool invoke(const ObjString* identifier, const int argCount) {
+  const Value receiver = peek(argCount);
+
+  if (!IS_INSTANCE(receiver)) {
+    runtimeError("Cannot call method on non-instance value.");
+    return false;
+  }
+
+  const ObjInstance* instance = AS_INSTANCE(receiver);
+
+  // If the method is actually a function field, call it as a function rather
+  // than performing a method lookup and invocation.
+  Value field;
+  if (tableGet(&instance->fields, identifier, &field)) {
+    // Replace receiver with field for function call frame stack
+    vm.stackTop[-1 - argCount] = field;
+    return callValue(field, argCount);
+  }
+
+  return invokeFromClass(instance->classObj, identifier, argCount);
+}
+
+/// Invoke a method with the given [identifier] from the given [classObj].
+///
+/// The method will be called using the receiver already on the stack below
+/// the method arguments.
+static bool invokeFromClass(
+  const ObjClass* classObj,
+  const ObjString* identifier,
+  const int argCount
+) {
+  Value method;
+  if (!tableGet(&classObj->methods, identifier, &method)) {
+    runtimeError("Undefined method '%s'", identifier->chars);
+    return false;
+  }
+
+  return callFun(AS_CLOSURE(method), argCount);
 }
 
 /// Capture an upvalue from the given [local] value pointer.
@@ -531,6 +579,18 @@ static InterpretResult run() {
         }
 
         // Update call frame to begin executing the called function
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
+      }
+
+      case OP_INVOKE: {
+        const ObjString* identifier = READ_STRING();
+        const uint8_t argCount = READ_BYTE();
+        if (!invoke(identifier, argCount)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        // Update call frame to begin executing the invoked method
         frame = &vm.frames[vm.frameCount - 1];
         break;
       }

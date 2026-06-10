@@ -1,16 +1,13 @@
-class CoffeeMaker {
-  init(coffee) {
-    this.coffee = coffee;
+class Oops {
+  init() {
+    fun f() {
+      print "not a method";
+    }
+
+    this.field = f;
   }
 
-  brew() {
-    print "Enjoy your cup of " + (this.coffee ?? "NOTHING!!") + "!";
-
-    // No reusing the grounds!
-    this.coffee = nil;
-  }
 }
 
-var maker = CoffeeMaker("coffee and chicory");
-maker.brew();
-maker.brew();
+var oops = Oops();
+oops.field();

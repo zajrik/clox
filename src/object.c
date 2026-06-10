@@ -119,7 +119,7 @@ ObjInstance* newInstance(ObjClass* classObj) {
 }
 
 /// Allocates a new [ObjMethod] and returns a pointer to it.
-ObjMethod* newMethod(Value receiver, ObjClosure* closure) {
+ObjMethod* newMethod(const Value receiver, ObjClosure* closure) {
   ObjMethod* method = ALLOCATE_OBJ(ObjMethod, OBJ_METHOD);
   method->receiver = receiver;
   method->closure = closure;

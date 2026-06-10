@@ -885,10 +885,21 @@ static void dot(const bool canAssign) {
   consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
   const uint8_t identOffset = makeIdentConstant(&parser.current);
 
+  // Handle property/field set expressions
   if (canAssign && nextMatches(TOKEN_EQUAL)) {
     expression();
     emitBytes(OP_SET_PROPERTY, identOffset);
-  } else {
+  }
+
+  // Handle property invocations
+  else if (nextMatches(TOKEN_LEFT_PAREN)) {
+    const uint8_t argCount = argumentList();
+    emitBytes(OP_INVOKE, identOffset);
+    emitByte(argCount);
+  }
+
+  // Otherwise compile as a property get expression
+  else {
     emitBytes(OP_GET_PROPERTY, identOffset);
   }
 }

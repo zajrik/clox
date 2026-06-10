@@ -97,6 +97,13 @@ static bool bindMethod(const ObjClass* classObj, const ObjString* identifier);
 
 static bool callValue(Value callee, int argCount);
 static bool callFun(ObjClosure* closure, int argCount);
+static bool invoke(const ObjString* identifier, int argCount);
+static bool invokeFromClass(
+  const ObjClass* classObj,
+  const ObjString* identifier,
+  int argCount
+);
+
 static ObjUpvalue* captureUpvalue(Value* local);
 
 static void concatenate();

@@ -98,6 +98,13 @@ typedef enum OpCode {
   /// values.
   OP_CALL,
 
+  /// Invoke a method by name. Must be followed two operands specifying a string
+  /// constants table offset pointing to the method's name and the number of
+  /// arguments being passed to the method via the stack.
+  ///
+  /// The receiver for the method will be on the stack below the arguments.
+  OP_INVOKE,
+
   /// Create a closure at runtime. Must be followed by an operand specifying a
   /// constants table offset pointing to a function value.
   OP_CLOSURE,

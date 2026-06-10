@@ -79,6 +79,7 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_LOOP: return jumpInstruction("OP_LOOP", -1, chunk, offset);
 
     case OP_CALL: return byteInstruction("OP_CALL", chunk, offset);
+    case OP_INVOKE: return invokeInstruction("OP_INVOKE", chunk, offset);
 
     case OP_CLOSURE: {
       int newOffset = offset + 1;
@@ -136,6 +137,21 @@ static int constantInstruction(const char* name, const Chunk* chunk, const int o
   printf("'\n");
 
   return offset + 2;
+}
+
+/// Prints the [name] of the given invoke instruction, as well as the two operands
+/// following it.
+///
+/// Returns the offset of the next instruction (skipping over the operands).
+static int invokeInstruction(const char* name, const Chunk* chunk, const int offset) {
+  const uint8_t constant = chunk->instructions[offset + 1];
+  const uint8_t argCount = chunk->instructions[offset + 2];
+
+  printf("%-16s (%d args) %4d '", name, argCount, constant);
+  printValue(chunk->constants.values[constant]);
+  printf("'\n");
+
+  return offset + 3;
 }
 
 /// Print the [name] of an instruction accepting a single operand, along with the
