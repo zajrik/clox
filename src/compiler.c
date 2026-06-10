@@ -822,6 +822,19 @@ static void call(bool _) {
   emitBytes(OP_CALL, argCount);
 }
 
+/// Compiles an object field get/set expression.
+static void dot(bool canAssign) {
+  consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+  const uint8_t identOffset = makeIdentConstant(&parser.current);
+
+  if (canAssign && nextMatches(TOKEN_EQUAL)) {
+    expression();
+    emitBytes(OP_SET_PROPERTY, identOffset);
+  } else {
+    emitBytes(OP_GET_PROPERTY, identOffset);
+  }
+}
+
 // @formatter:off
 /// Table holding token parse rules.
 static ParseRule rules[] = {
@@ -832,7 +845,7 @@ static ParseRule rules[] = {
   [TOKEN_LEFT_BRACE]    = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_RIGHT_BRACE]   = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_COMMA]         = {NULL,       NULL,     PREC_NONE       },
-  [TOKEN_DOT]           = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_DOT]           = {NULL,       dot,      PREC_CALL       },
   [TOKEN_SEMICOLON]     = {NULL,       NULL,     PREC_NONE       },
 
   // Multiple-character token rules

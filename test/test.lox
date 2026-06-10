@@ -1,12 +1,8 @@
-fun foo(a, b, c) = (a + b(a, c) + c) * 2;
+class Pair {}
 
-var z = 123;
-
-{
-    var y = 246;
-    print foo(5, fun(c, d) = c * d * z + y, 13);
-}
-
-class Brioche {}
-print Brioche;
-print Brioche();
+var pair = Pair();
+pair.first = 1;
+pair.second = 2;
+pair.add = fun() = pair.first + pair.second;
+print pair.add(); // 3.
+print pair.foo;

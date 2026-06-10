@@ -160,6 +160,7 @@ static void variable(bool canAssign);
 static void variableGetSet(Token identifier, bool canAssign);
 static void grouping(bool);
 static void call(bool);
+static void dot(bool canAssign);
 
 static ParseRule* getRule(TokenType type);
 

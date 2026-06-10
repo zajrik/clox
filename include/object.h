@@ -40,6 +40,7 @@ typedef enum ObjType {
 /// Represents the type of a function.
 typedef enum FunctionType {
   TYPE_FUNCTION,
+  TYPE_METHOD,
   TYPE_SCRIPT,
 } FunctionType;
 

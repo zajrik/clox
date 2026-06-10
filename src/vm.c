@@ -126,7 +126,7 @@ static bool callValue(const Value callee, const int argCount) {
       }
 
       case OBJ_CLOSURE: return callFun(AS_CLOSURE(callee), argCount);
-        
+
       case OBJ_NATIVE: {
         const ObjNative* nativeObj = AS_NATIVE_OBJ(callee);
 
@@ -393,6 +393,50 @@ static InterpretResult run() {
       case OP_GET_UPVALUE: {
         const uint8_t slot = READ_BYTE();
         push(*frame->closure->upvalues[slot]->location);
+        break;
+      }
+
+      // Set the value of the property obtained from the operand byte on the instance
+      // one slot down from the top of the stack to the value on the top of the stack.
+      case OP_SET_PROPERTY: {
+        if (!IS_INSTANCE(peek(1))) {
+          runtimeError("Only class instances have fields");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(peek(1));
+        ObjString* ident = READ_STRING();
+
+        tableSet(&instance->fields, ident, peek(0));
+        const Value value = pop();
+
+        // Pop instance off of the stack
+        pop();
+
+        push(value);
+        break;
+      }
+
+      // Get the value of the property obtained from the operand byte on the instance
+      // at the top of the stack
+      case OP_GET_PROPERTY: {
+        if (!IS_INSTANCE(peek(0))) {
+          runtimeError("Only class instances have properties.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        const ObjInstance* instance = AS_INSTANCE(peek(0));
+        const ObjString* ident = READ_STRING();
+
+        Value value;
+        if (tableGet(&instance->fields, ident, &value)) {
+          pop();
+          push(value);
+          break;
+        }
+
+        // Return nil if property doesn't exist.
+        push(NIL_VAL);
         break;
       }
 
