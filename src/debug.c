@@ -58,17 +58,9 @@ int disassembleInstruction(const Chunk* chunk, const int offset) {
     case OP_CLOSE_UPVALUE: return simpleInstruction("OP_CLOSE_UPVALUE", offset);
 
     case OP_DEFINE_GLOBAL: return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
-    case OP_SET_GLOBAL: return constantInstruction("OP_SET_GLOBAL", chunk, offset);
-    case OP_GET_GLOBAL: return constantInstruction("OP_GET_GLOBAL", chunk, offset);
 
-    case OP_SET_LOCAL: return byteInstruction("OP_SET_LOCAL", chunk, offset);
-    case OP_GET_LOCAL: return byteInstruction("OP_GET_LOCAL", chunk, offset);
-
-    case OP_SET_UPVALUE: return byteInstruction("OP_SET_UPVALUE", chunk, offset);
-    case OP_GET_UPVALUE: return byteInstruction("OP_GET_UPVALUE", chunk, offset);
-
-    case OP_SET_PROPERTY: return byteInstruction("OP_SET_PROPERTY", chunk, offset);
-    case OP_GET_PROPERTY: return byteInstruction("OP_GET_PROPERTY", chunk, offset);
+    case OP_SET_VALUE: return variableInstruction("OP_SET_VALUE", chunk, offset);
+    case OP_GET_VALUE: return variableInstruction("OP_GET_VALUE", chunk, offset);
 
     case OP_PRINT: return simpleInstruction("OP_PRINT", offset);
 
@@ -137,6 +129,27 @@ static int constantInstruction(const char* name, const Chunk* chunk, const int o
   printf("'\n");
 
   return offset + 2;
+}
+
+/// Prints the [name] of a variable instruction at [offset] in the given [chunk]'s
+/// instructions array, followed by the variable offset and the [VariableKind] from
+/// the following operands.
+///
+/// Returns the offset of the next instruction (skipping over the operands).
+static int variableInstruction(const char* name, const Chunk* chunk, const int offset) {
+  const VariableKind kind = chunk->instructions[offset + 1];
+  const uint8_t varOffset = chunk->instructions[offset + 2];
+
+  const char* kindStr = "UNKNOWN";
+  switch (kind) {
+    case VAR_GLOBAL: DO(kindStr = "GLOBAL");
+    case VAR_LOCAL: DO(kindStr = "LOCAL");
+    case VAR_UPVALUE: DO(kindStr = "UPVALUE");
+    case VAR_PROPERTY: DO(kindStr = "PROPERTY");
+  }
+
+  printf("%-16s %4d (%s)\n", name, varOffset, kindStr);
+  return offset + 3;
 }
 
 /// Prints the [name] of the given invoke instruction, as well as the two operands

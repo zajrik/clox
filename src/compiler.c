@@ -785,19 +785,15 @@ static void variable(const bool canAssign) {
 /// Compiles a variable/identifier get/set expression, emitting bytecode to fetch/set
 /// the value for that variable/identifier.
 static void variableGetSet(const Token identifier, const bool canAssign) {
-  uint8_t getOp, setOp;
-
+  VariableKind kind;
   int varOffset = resolveLocal(compiler, &identifier);
   if (varOffset != -1) {
-    getOp = OP_GET_LOCAL;
-    setOp = OP_SET_LOCAL;
+    kind = VAR_LOCAL;
   } else if ((varOffset = resolveUpvalue(compiler, &identifier)) != -1) {
-    getOp = OP_GET_UPVALUE;
-    setOp = OP_SET_UPVALUE;
+    kind = VAR_UPVALUE;
   } else {
     varOffset = makeIdentConstant(&identifier);
-    getOp = OP_GET_GLOBAL;
-    setOp = OP_SET_GLOBAL;
+    kind = VAR_GLOBAL;
   }
 
   // Handle valid assignment operators
@@ -806,43 +802,51 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
       case TOKEN_EQUAL:
         advance();
         expression();
-        return emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        return emitBytes(kind, (uint8_t)varOffset);
 
       case TOKEN_PLUS_EQUAL:
         advance();
-        emitBytes(getOp, (uint8_t)varOffset);
+        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
         expression();
         emitByte(OP_ADD);
-        return emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        return emitBytes(kind, (uint8_t)varOffset);
 
       case TOKEN_MINUS_EQUAL:
         advance();
-        emitBytes(getOp, (uint8_t)varOffset);
+        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
         expression();
         emitByte(OP_SUBTRACT);
-        return emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        return emitBytes(kind, (uint8_t)varOffset);
 
       case TOKEN_STAR_EQUAL:
         advance();
-        emitBytes(getOp, (uint8_t)varOffset);
+        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
         expression();
         emitByte(OP_MULTIPLY);
-        return emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        return emitBytes(kind, (uint8_t)varOffset);
 
       case TOKEN_SLASH_EQUAL:
         advance();
-        emitBytes(getOp, (uint8_t)varOffset);
+        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
         expression();
         emitByte(OP_DIVIDE);
-        return emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        return emitBytes(kind, (uint8_t)varOffset);
 
       case TOKEN_NILISH_EQUAL:
         advance();
-        emitBytes(getOp, (uint8_t)varOffset);
+        emitByte(OP_GET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
         const int end = emitJump(OP_JUMP_IF_NOT_NIL);
+
         emitByte(OP_POP);
         expr(PREC_OR);
-        emitBytes(setOp, (uint8_t)varOffset);
+        emitByte(OP_SET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
 
         // Patch jump after set op so we're not wasting a cycle on setting a
         // value that hasn't changed
@@ -852,7 +856,8 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
     }
   }
 
-  emitBytes(getOp, (uint8_t)varOffset);
+  emitByte(OP_GET_VALUE);
+  emitBytes(kind, (uint8_t)varOffset);
 }
 
 /// Compiles a `this` expression.
@@ -888,19 +893,21 @@ static void dot(const bool canAssign) {
   // Handle property/field set expressions
   if (canAssign && nextMatches(TOKEN_EQUAL)) {
     expression();
-    emitBytes(OP_SET_PROPERTY, identOffset);
+    emitByte(OP_SET_VALUE);
+    emitBytes(VAR_PROPERTY, identOffset);
   }
 
   // Handle property invocations
   else if (nextMatches(TOKEN_LEFT_PAREN)) {
     const uint8_t argCount = argumentList();
-    emitBytes(OP_INVOKE, identOffset);
-    emitByte(argCount);
+    emitByte(OP_INVOKE);
+    emitBytes(identOffset, argCount);
   }
 
   // Otherwise compile as a property get expression
   else {
-    emitBytes(OP_GET_PROPERTY, identOffset);
+    emitByte(OP_GET_VALUE);
+    emitBytes(VAR_PROPERTY, identOffset);
   }
 }
 
@@ -1208,7 +1215,8 @@ static void emitConstant(const Value value) {
 static void emitDefaultReturn() {
   // If we're compiling an initializer, put the instance on the stack to return
   if (compiler->type == TYPE_INITIALIZER) {
-    emitBytes(OP_GET_LOCAL, 0);
+    emitByte(OP_GET_VALUE);
+    emitBytes(VAR_LOCAL, 0);
     return emitByte(OP_RETURN);
   }
 

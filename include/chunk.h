@@ -65,25 +65,22 @@ typedef enum OpCode {
   /// Pop the top value off of the stack, printing it.
   OP_PRINT,
 
+  /// Define a global variable using constant string offset operand as the identifier
+  /// and the value at the top of the stack as the value.
   OP_DEFINE_GLOBAL,
-  OP_SET_GLOBAL,
-  OP_GET_GLOBAL,
 
-  OP_SET_LOCAL,
-  OP_GET_LOCAL,
+  /// Sets a value. Must be followed by two operands in the given order:
+  /// - [VariableKind]
+  /// - Offset byte pointing to variable location, interpretation of which is
+  ///   dictated by the preceding operand
+  OP_SET_VALUE,
 
-  OP_SET_UPVALUE,
-  OP_GET_UPVALUE,
+  /// Gets a value. Must be followed by two operands in the given order:
+  /// - [VariableKind]
+  /// - Offset byte pointing to variable location, interpretation of which is
+  ///   dictated by the preceding operand
+  OP_GET_VALUE,
 
-  /// Pop the top value off of the stack, assign it to a field with the name obtained
-  /// from the operand byte (string constants table offset) on the receiver object
-  /// below the popped value on the stack.
-  OP_SET_PROPERTY,
-
-  /// Pop the receiver object off of the top of the stack. Push the property with
-  /// the name obtained from the operand byte (string constants table offset)
-  /// found on the receiver to the top of the stack.
-  OP_GET_PROPERTY,
 
   OP_JUMP_IF_FALSE,
   OP_JUMP_IF_TRUE,
@@ -120,6 +117,14 @@ typedef enum OpCode {
   /// Return a value (or nothing) from a function.
   OP_RETURN,
 } OpCode;
+
+/// Represents the kind of variable in a get/set expression.
+typedef enum VariableKind {
+  VAR_GLOBAL,
+  VAR_LOCAL,
+  VAR_UPVALUE,
+  VAR_PROPERTY,
+} VariableKind;
 
 /// A chunk of lox instruction opcodes and operands compiled from source.
 ///
