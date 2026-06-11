@@ -126,6 +126,8 @@ typedef enum VariableKind {
   VAR_PROPERTY,
 } VariableKind;
 
+char* stringifyVarKind(VariableKind kind);
+
 /// A chunk of lox instruction opcodes and operands compiled from source.
 ///
 /// Implemented as a dynamically-sized array of instructions and values (operands).

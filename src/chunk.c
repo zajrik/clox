@@ -77,3 +77,14 @@ int addConstant(Chunk* chunk, const Value value) {
   pop();
   return constantOffset;
 }
+
+/// Returns a string representation of the given [VariableKind].
+char* stringifyVarKind(const VariableKind kind) {
+  switch (kind) {
+    case VAR_GLOBAL: return "GLOBAL";
+    case VAR_LOCAL: return "LOCAL";
+    case VAR_UPVALUE: return "UPVALUE";
+    case VAR_PROPERTY: return "PROPERTY";
+  }
+  return "UNKNOWN";
+}

@@ -140,15 +140,7 @@ static int variableInstruction(const char* name, const Chunk* chunk, const int o
   const VariableKind kind = chunk->instructions[offset + 1];
   const uint8_t varOffset = chunk->instructions[offset + 2];
 
-  const char* kindStr = "UNKNOWN";
-  switch (kind) {
-    case VAR_GLOBAL: DO(kindStr = "GLOBAL");
-    case VAR_LOCAL: DO(kindStr = "LOCAL");
-    case VAR_UPVALUE: DO(kindStr = "UPVALUE");
-    case VAR_PROPERTY: DO(kindStr = "PROPERTY");
-  }
-
-  printf("%-16s %4d (%s)\n", name, varOffset, kindStr);
+  printf("%-16s %4d (%s)\n", name, varOffset, stringifyVarKind(kind));
   return offset + 3;
 }
 
