@@ -11,3 +11,8 @@ class Oops {
 
 var oops = Oops();
 oops.field();
+
+var b;
+var a = !true ? b = "foo" : "bar";
+print a;
+print b;

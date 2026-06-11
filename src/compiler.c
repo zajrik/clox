@@ -904,6 +904,21 @@ static void dot(const bool canAssign) {
   }
 }
 
+/// Compiles a conditional/ternary operator expression from scanned tokens.
+static void ternary(bool _) {
+  // The condition is already on the stack and the '?' is already consumed
+  // at this point so we can jump right in to some jumps
+  const int thenBranch = emitJump(OP_JUMP_IF_FALSE);
+  expression();
+  const int exitJump = emitJump(OP_JUMP);
+
+  consume(TOKEN_COLON, "Expect ':' after '?' expression.");
+
+  patchJump(thenBranch);
+  expression();
+  patchJump(exitJump);
+}
+
 // @formatter:off
 /// Table holding token parse rules.
 static ParseRule rules[] = {
@@ -916,6 +931,7 @@ static ParseRule rules[] = {
   [TOKEN_COMMA]         = {NULL,       NULL,     PREC_NONE       },
   [TOKEN_DOT]           = {NULL,       dot,      PREC_CALL       },
   [TOKEN_SEMICOLON]     = {NULL,       NULL,     PREC_NONE       },
+  [TOKEN_QUESTION]      = {NULL,       ternary,  PREC_ASSIGNMENT },
 
   // Multiple-character token rules
   [TOKEN_MINUS]         = {unary,      binary,   PREC_TERM       },
