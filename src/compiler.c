@@ -807,7 +807,8 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
 
       case TOKEN_PLUS_EQUAL:
         advance();
-        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
+        emitByte(OP_GET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
         expression();
         emitByte(OP_ADD);
         emitByte(OP_SET_VALUE);
@@ -815,7 +816,8 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
 
       case TOKEN_MINUS_EQUAL:
         advance();
-        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
+        emitByte(OP_GET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
         expression();
         emitByte(OP_SUBTRACT);
         emitByte(OP_SET_VALUE);
@@ -823,7 +825,8 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
 
       case TOKEN_STAR_EQUAL:
         advance();
-        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
+        emitByte(OP_GET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
         expression();
         emitByte(OP_MULTIPLY);
         emitByte(OP_SET_VALUE);
@@ -831,7 +834,8 @@ static void variableGetSet(const Token identifier, const bool canAssign) {
 
       case TOKEN_SLASH_EQUAL:
         advance();
-        emitBytes(OP_GET_VALUE, (uint8_t)varOffset);
+        emitByte(OP_GET_VALUE);
+        emitBytes(kind, (uint8_t)varOffset);
         expression();
         emitByte(OP_DIVIDE);
         emitByte(OP_SET_VALUE);
