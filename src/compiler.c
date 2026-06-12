@@ -916,12 +916,14 @@ static void ternary(bool _) {
   // The condition is already on the stack and the '?' is already consumed
   // at this point so we can jump right in to some jumps
   const int thenBranch = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
   expression();
   const int exitJump = emitJump(OP_JUMP);
 
   consume(TOKEN_COLON, "Expect ':' after '?' expression.");
 
   patchJump(thenBranch);
+  emitByte(OP_POP);
   expression();
   patchJump(exitJump);
 }
