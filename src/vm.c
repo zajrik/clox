@@ -298,6 +298,136 @@ static void concatenate() {
   push(OBJ_VAL(takeString(chars, length)));
 }
 
+#define OFFSET_AS_CONSTANT(offset) (frame->closure->function->chunk.constants.values[offset])
+#define OFFSET_AS_STRING(offset) AS_STRING(OFFSET_AS_CONSTANT(offset))
+#define OFFSET_AS_LOCAL(offset) (frame->slots[offset])
+#define OFFSET_AS_UPVALUE(offset) (*frame->closure->upvalues[offset]->location)
+
+/// Get a variable of the given kind from the given offset, pushing it to the stack.
+///
+/// If [kind] is [VAR_PROPERTY], it is expected that the instance we're getting the
+/// property from is at the top of the stack.
+static void getValue(const CallFrame* frame, const VariableKind kind, const uint8_t offset) {
+  switch (kind) {
+    // Get global variable name from constants via the given offset
+    case VAR_GLOBAL: {
+      const ObjString* name = OFFSET_AS_STRING(offset);
+
+      // Get value from globals table
+      Value value;
+      if (!tableGet(&vm.globals, name, &value)) {
+        runtimeError("Undefined variable '%s'.", name->chars);
+        return;
+      }
+
+      push(value);
+      break;
+    }
+
+    // Local variable get expression op. Reads the local variable from its stack
+    // slot (the given offset) and pushes it to the top of stack.
+    //
+    // The variable's value already exists on the stack in the slot from when it
+    // was declared, which will be modified in-place by OP_SET_VALUE (VAR_LOCAL)
+    // and will stay on the stack until the local goes out of scope.
+    //
+    // In contrast, the value we're pushing to the top of the stack here is the
+    // result of a variable get expression and will be consumed by the enclosing
+    // expression (or discarded at the end of a statement)
+    case VAR_LOCAL: DO(push(OFFSET_AS_LOCAL(offset)));
+
+    // Get an upvalue from the current closure at the given offset and push it
+    // to the top of the stack
+    case VAR_UPVALUE: DO(push(OFFSET_AS_UPVALUE(offset)));
+
+    // Get the value of the property obtained from the given offset on the
+    // instance at the top of the stack
+    case VAR_PROPERTY: {
+      if (!IS_INSTANCE(peek(0))) {
+        runtimeError("Only class instances have properties.");
+        return;
+      }
+
+      const ObjInstance* instance = AS_INSTANCE(peek(0));
+      const ObjString* identifier = OFFSET_AS_STRING(offset);
+
+      // Get field value and push it to the stack
+      Value value;
+      if (tableGet(&instance->fields, identifier, &value)) {
+        pop();
+        push(value);
+        break;
+      }
+
+      // If we couldn't get a field, try it as a method. If a method is found
+      // by bindMethod it will be on the stack already and we can end this op
+      if (bindMethod(instance->classObj, identifier)) break;
+
+      // Return nil if property doesn't exist.
+      pop();
+      push(NIL_VAL);
+    }
+  }
+}
+
+/// Set a value of the given [kind] at the given [offset].
+///
+/// For all [kind] values, it is expected that the value being set is at the top
+/// of the stack.
+///
+/// If [kind] is [VAR_PROPERTY], it is expected that the instance we're setting
+/// the property on is next on the stack below the value being set.
+static void setValue(const CallFrame* frame, const VariableKind kind, const uint8_t offset) {
+  switch (kind) {
+    // Global variable set expression op, leaves value on the stack for the same
+    // reasons described in the notes for VAR_LOCAL below
+    case VAR_GLOBAL: {
+      ObjString* name = OFFSET_AS_STRING(offset);
+      if (tableSet(&vm.globals, name, peek(0))) {
+        tableDelete(&vm.globals, name);
+        runtimeError("Undefined variable '%s'.", name->chars);
+      }
+      break;
+    }
+
+    // Local variable set expression op. Assigns the value at the top of the stack
+    // to the stack slot at the given offset.
+    //
+    // The stack-top value stays because it is also the result of the assignment
+    // expression and will be popped when consumed by further expressions (or at
+    // the end of the statement if the assignment is an expression statement)
+    case VAR_LOCAL: DO(frame->slots[offset] = peek(0));
+
+    // Set the upvalue obtained from the given offset.
+    case VAR_UPVALUE: DO(*frame->closure->upvalues[offset]->location = peek(0));
+
+    // Set the value of the property obtained from the given offset on the instance
+    // one slot down from the top of the stack to the value on the top of the stack
+    case VAR_PROPERTY: {
+      if (!IS_INSTANCE(peek(1))) {
+        runtimeError("Only class instances have fields");
+        return;
+      }
+
+      ObjInstance* instance = AS_INSTANCE(peek(1));
+      ObjString* ident = OFFSET_AS_STRING(offset);
+
+      // Set field to stack top value,
+      tableSet(&instance->fields, ident, peek(0));
+      const Value value = pop();
+
+      // Replace instance on stack with value
+      pop();
+      push(value);
+    }
+  }
+}
+
+#undef OFFSET_AS_CONSTANT
+#undef OFFSET_AS_STRING
+#undef OFFSET_AS_LOCAL
+#undef OFFSET_AS_UPVALUE
+
 /// Interpret the given lox source code text.
 ///
 /// Code will be compiled and then run on the virtual machine.
@@ -430,114 +560,13 @@ static InterpretResult run() {
 
       case OP_SET_VALUE: {
         const VariableKind kind = READ_BYTE();
-        switch (kind) {
-          // Global variable set expression op, leaves value on the stack for the same
-          // reasons described in the notes for VAR_LOCAL below
-          case VAR_GLOBAL: {
-            ObjString* name = READ_STRING();
-            if (tableSet(&vm.globals, name, peek(0))) {
-              tableDelete(&vm.globals, name);
-              runtimeError("Undefined variable '%s'.", name->chars);
-              return INTERPRET_RUNTIME_ERROR;
-            }
-            break;
-          }
-
-          // Local variable set expression op. Assigns the value at the top of the stack
-          // to the stack slot where the local variable lives (obtained from the operand).
-          //
-          // The stack-top value stays because it is also the result of the assignment
-          // expression and will be popped when consumed by further expressions (or at
-          // the end of the statement if the assignment is an expression statement)
-          case VAR_LOCAL: DO(frame->slots[READ_BYTE()] = peek(0));
-
-          // Set the upvalue obtained from the next operand byte.
-          case VAR_UPVALUE: DO(*frame->closure->upvalues[(READ_BYTE())]->location = peek(0));
-
-          // Set the value of the property obtained from the operand byte on the instance
-          // one slot down from the top of the stack to the value on the top of the stack
-          case VAR_PROPERTY: {
-            if (!IS_INSTANCE(peek(1))) {
-              runtimeError("Only class instances have fields");
-              return INTERPRET_RUNTIME_ERROR;
-            }
-
-            ObjInstance* instance = AS_INSTANCE(peek(1));
-            ObjString* ident = READ_STRING();
-
-            // Set field to stack top value,
-            tableSet(&instance->fields, ident, peek(0));
-            const Value value = pop();
-
-            // Replace instance on stack with value
-            pop();
-            push(value);
-          }
-        }
+        setValue(frame, kind, READ_BYTE());
         break;
       }
 
       case OP_GET_VALUE: {
         const VariableKind kind = READ_BYTE();
-        switch (kind) {
-          case VAR_GLOBAL: {
-            // Get global variable name from constants via offset operand
-            const ObjString* name = READ_STRING();
-
-            // Get value from globals table
-            Value value;
-            if (!tableGet(&vm.globals, name, &value)) {
-              runtimeError("Undefined variable '%s'.", name->chars);
-              return INTERPRET_RUNTIME_ERROR;
-            }
-
-            push(value);
-            break;
-          }
-
-          // Local variable get expression op. Reads the local variable from its stack
-          // slot (obtained from the operand) and pushes it to the top of stack.
-          //
-          // The variable's value already exists on the stack in the slot from when it
-          // was declared, which will be modified in-place by OP_SET_VALUE (VAR_LOCAL)
-          // and will stay on the stack until the local goes out of scope.
-          //
-          // In contrast, the value we're pushing to the top of the stack here is the
-          // result of a variable get expression and will be consumed by the enclosing
-          // expression (or discarded at the end of a statement).
-          case VAR_LOCAL: DO(push(frame->slots[READ_BYTE()]));
-
-          // Pull an upvalue from the current closure and push it to the stack.
-          case VAR_UPVALUE: DO(push(*frame->closure->upvalues[(READ_BYTE())]->location));
-
-          // Get the value of the property obtained from the operand byte on the instance
-          // at the top of the stack
-          case VAR_PROPERTY: {
-            if (!IS_INSTANCE(peek(0))) {
-              runtimeError("Only class instances have properties.");
-              return INTERPRET_RUNTIME_ERROR;
-            }
-
-            const ObjInstance* instance = AS_INSTANCE(peek(0));
-            const ObjString* identifier = READ_STRING();
-
-            // Get field value and push it to the stack
-            Value value;
-            if (tableGet(&instance->fields, identifier, &value)) {
-              pop();
-              push(value);
-              break;
-            }
-
-            // If we couldn't get a field, try it as a method. If a method is found
-            // by bindMethod it will be on the stack already and we can end this op
-            if (bindMethod(instance->classObj, identifier)) break;
-
-            // Return nil if property doesn't exist.
-            pop();
-            push(NIL_VAL);
-          }
-        }
+        getValue(frame, kind, READ_BYTE());
         break;
       }
 
